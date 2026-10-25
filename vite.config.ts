@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 
-export default defineConfig({
-  base: process.env.GITHUB_ACTIONS ? '/Nocturne/' : '/',
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/Nocturne/' : '/',
   publicDir: false,
   server: { host: true },
-})
+}))
