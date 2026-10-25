@@ -52,6 +52,7 @@ if (!app) throw new Error('Application root element was not found.')
 app.innerHTML = `
   <video class="hero-video" autoplay muted loop playsinline preload="auto" aria-hidden="true">
   </video>
+  <iframe class="particle-layer" src="./particle.html" title="Nocturne particle field" aria-hidden="true" tabindex="-1"></iframe>
   <div class="scene-layer" aria-label="Nocturne perfume bottle"></div>
   <p class="load-status" role="status">Loading bottle…</p>
   <details class="bottle-editor" open>

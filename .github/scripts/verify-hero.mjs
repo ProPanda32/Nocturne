@@ -24,6 +24,7 @@ for (let attempt = 0; attempt < 30; attempt++) {
 }
 
 await page.locator('.load-status').waitFor({ state: 'detached', timeout: 45000 })
+await page.frameLocator('.particle-layer').locator('canvas').waitFor({ timeout: 45000 })
 await mkdir('.github/preview', { recursive: true })
 await page.screenshot({ path: '.github/preview/diagnostic.png', fullPage: true })
 const media = await page.evaluate(() => {
