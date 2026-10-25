@@ -16,7 +16,7 @@ page.on('response', (response) => { if (response.status() >= 400) errors.push(`$
 
 for (let attempt = 0; attempt < 30; attempt++) {
   try {
-    const response = await page.goto('http://127.0.0.1:4173/Nocturne/', { waitUntil: 'domcontentloaded' })
+    const response = await page.goto('http://127.0.0.1:5173/', { waitUntil: 'domcontentloaded' })
     if (response?.ok()) break
   } catch {
     await new Promise((resolve) => setTimeout(resolve, 1000))

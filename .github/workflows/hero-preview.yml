@@ -27,7 +27,7 @@ jobs:
           npx playwright install --with-deps chrome
       - name: Verify hero in browser
         run: |
-          npm run preview -- --host 127.0.0.1 > /tmp/nocturne-vite.log 2>&1 &
+          npm run dev -- --host 127.0.0.1 > /tmp/nocturne-vite.log 2>&1 &
           node .github/scripts/verify-hero.mjs
       - name: Publish preview screenshots
         run: |
