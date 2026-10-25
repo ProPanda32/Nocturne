@@ -54,7 +54,6 @@ console.log('Particle engine state:', particleState)
 if (particleState !== 'ready') throw new Error('Particle engine did not start: ' + errors.join('; '))
 await page.waitForTimeout(2000)
 await mkdir('.github/preview', { recursive: true })
-await page.screenshot({ path: '.github/preview/diagnostic.png', fullPage: true })
 const media = await page.evaluate(() => {
   const video = document.querySelector('video')
   const canvas = document.querySelector('canvas')
@@ -82,11 +81,18 @@ if (!copied.includes('"cameraFov": 50')) throw new Error('Copy Settings failed')
 await page.locator('[data-action="reset"]').click()
 if (await fov.inputValue() !== '35') throw new Error('Reset failed')
 
-await mkdir('.github/preview', { recursive: true })
-await page.screenshot({ path: '.github/preview/desktop.png', fullPage: true })
-await page.setViewportSize({ width: 390, height: 844 })
-await page.screenshot({ path: '.github/preview/mobile.png', fullPage: true })
-
 if (errors.length) throw new Error('Browser errors: ' + errors.join('; '))
-console.log('Hero verified: bottle, video, canvas, editor, reset, clipboard, desktop and mobile screenshots.')
+await mkdir('.github/preview', { recursive: true })
+for (const [name, size] of [
+  ['desktop', { width: 1440, height: 900 }],
+  ['mobile', { width: 390, height: 844 }],
+]) {
+  await page.setViewportSize(size)
+  try {
+    await page.screenshot({ path: `.github/preview/${name}.png`, fullPage: true, timeout: 15000 })
+  } catch (error) {
+    console.warn(`Screenshot ${name} unavailable with software WebGPU:`, error.message)
+  }
+}
+console.log('Hero verified: bottle, video, WebGPU particles, editor, reset and clipboard.')
 await browser.close()
