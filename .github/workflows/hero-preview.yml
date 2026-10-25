@@ -1,0 +1,54 @@
+name: Hero preview check
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build
+        run: npm run build
+      - name: Install browser
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chrome
+      - name: Verify hero in browser
+        run: |
+          npm run dev -- --host 127.0.0.1 > /tmp/nocturne-vite.log 2>&1 &
+          node .github/scripts/verify-hero.mjs
+      - name: Publish preview screenshots
+        run: |
+          mkdir -p previews
+          if [ -f .github/preview/desktop.png ] && [ -f .github/preview/mobile.png ]; then
+            cp .github/preview/desktop.png previews/hero-desktop.png
+            cp .github/preview/mobile.png previews/hero-mobile.png
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add previews/hero-desktop.png previews/hero-mobile.png
+            if ! git diff --cached --quiet; then
+              git commit -m 'Update hero preview screenshots'
+              git push origin HEAD:main
+            fi
+          else
+            echo 'Screenshots unavailable in software WebGPU; browser checks completed.'
+          fi
+      - name: Save preview screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nocturne-hero-preview
+          path: .github/preview/
+          if-no-files-found: ignore
