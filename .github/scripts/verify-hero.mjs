@@ -81,6 +81,27 @@ if (!copied.includes('"cameraFov": 50')) throw new Error('Copy Settings failed')
 await page.locator('[data-action="reset"]').click()
 if (await fov.inputValue() !== '35') throw new Error('Reset failed')
 
+const particleToggle = page.locator('.particle-settings-toggle')
+await particleToggle.click()
+const particlePanel = page.frameLocator('.particle-layer')
+await particlePanel.locator('.appearance-dock').waitFor({ state: 'visible' })
+if (await particlePanel.locator('.appearance-dock > .composition-editor').count() !== 3) {
+  throw new Error('Particle composition, physics and appearance controls were not mounted')
+}
+await particlePanel.locator('.appearance-dock > .composition-editor').first().locator('summary').click()
+const density = particlePanel.locator('[data-group="field"][data-key="density"] input')
+await density.evaluate((element) => {
+  element.value = '0.8'
+  element.dispatchEvent(new Event('input', { bubbles: true }))
+})
+if ((await particlePanel.locator('[data-group="field"][data-key="density"] output').textContent())?.trim() !== '80%') {
+  throw new Error('Particle density control did not update')
+}
+await particleToggle.click()
+if (await particleToggle.getAttribute('aria-expanded') !== 'false') {
+  throw new Error('Particle settings toggle did not close')
+}
+
 if (errors.length) throw new Error('Browser errors: ' + errors.join('; '))
 await mkdir('.github/preview', { recursive: true })
 for (const [name, size] of [

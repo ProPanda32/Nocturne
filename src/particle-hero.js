@@ -1,10 +1,11 @@
 import * as THREE from 'three/webgpu';
 import { Fn, If, hash, instancedArray, instanceIndex, vec3, vec4, uniform, uv, smoothstep, mix, float, positionView, select } from 'three/tsl';
-import { defaultSettings } from '../Public/Assets/Nocturne-Particle-Engine-v1/src/editor.js';
-import { defaultPhysicsSettings, physicsFields } from '../Public/Assets/Nocturne-Particle-Engine-v1/src/physics-editor.js';
+import { createCompositionEditor, defaultSettings } from '../Public/Assets/Nocturne-Particle-Engine-v1/src/editor.js';
+import { createPhysicsEditor, defaultPhysicsSettings, physicsFields } from '../Public/Assets/Nocturne-Particle-Engine-v1/src/physics-editor.js';
 import { createPhysicsSimulation } from '../Public/Assets/Nocturne-Particle-Engine-v1/src/physics.js';
 import { createPointerInput } from '../Public/Assets/Nocturne-Particle-Engine-v1/src/pointer.js';
 import { createParticleLook } from '../Public/Assets/Nocturne-Particle-Engine-v1/src/look.js';
+import { createLookEditor } from '../Public/Assets/Nocturne-Particle-Engine-v1/src/look-editor.js';
 import { shapeDepth } from '../Public/Assets/Nocturne-Particle-Engine-v1/src/depth-shape.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import './particle-hero.css';
@@ -24,6 +25,14 @@ document.querySelector('#app').appendChild(renderer.domElement);
 const DEFAULT_PARTICLE_COUNT = 70_000;
 const PARTICLE_CAPACITY = 100_000;
 const settings = defaultSettings();
+try {
+  const saved = JSON.parse(localStorage.getItem('particleCameraView') || 'null');
+  if (saved && Number.isFinite(saved.fov) && Number.isFinite(saved.distance)) {
+    settings.depth.fov = THREE.MathUtils.clamp(saved.fov, 25, 100);
+    settings.depth.distance = THREE.MathUtils.clamp(saved.distance, 12, 120);
+    settings.depth.cameraSaved = true;
+  }
+} catch { /* The site camera remains at its original defaults. */ }
 camera.fov = settings.depth.fov;
 camera.position.z = settings.depth.distance - 20;
 camera.updateProjectionMatrix();
@@ -64,6 +73,11 @@ const initialState = uniform(1);
 const physicsSettings = defaultPhysicsSettings();
 const physicsUniforms = Object.fromEntries(physicsFields.map(([key]) => [key, uniform(physicsSettings[key])]));
 const pointerInput = createPointerInput(renderer.domElement, camera, physicsSettings);
+function applyPhysicsSettings(state) {
+  for (const [key, node] of Object.entries(physicsUniforms)) node.value = state[key];
+  if (state.frozen) pointerInput.uniforms.active.value = 0;
+}
+
 function wingPosition(side, rootXValue, rootYValue, rootZValue, t, outerX, outerY, outerZ, spread, offset, interior, controls) {
   const rootX = structureUniforms.rootWidth.mul(rootXValue);
   const rootY = float(rootYValue);
@@ -246,6 +260,8 @@ window.addEventListener('resize', () => {
   applyCameraView();
 });
 
+let compositionDirty = false;
+let preserveWorldPosition = true;
 function applyCameraView() {
   camera.fov = settings.depth.fov;
   camera.updateProjectionMatrix();
@@ -260,6 +276,57 @@ function applyCameraView() {
   orbit.update();
   pointerInput.uniforms.cameraZ.value = camera.position.z;
 }
+function applyEditorSettings(state, change = { group: 'reset' }) {
+  for (const group of ['upper', 'lower']) {
+    for (const side of ['left', 'right']) {
+      for (const [key, value] of Object.entries(state[group][side])) wingUniforms[group][side][key].value = value;
+    }
+  }
+  for (const [key, value] of Object.entries(state.structure)) structureUniforms[key].value = value;
+  for (const [key, value] of Object.entries(state.field)) fieldUniforms[key].value = value;
+  for (const [key, value] of Object.entries(state.bead)) beadUniforms[key].value = value;
+  for (const [key, node] of Object.entries(depthUniforms)) node.value = state.depth[key];
+  if (change.group === 'depth' || change.group === 'reset') {
+    if (change.key === 'fov' || change.key === 'distance') state.depth.cameraSaved = false;
+    if (change.key === 'saveCamera') localStorage.setItem('particleCameraView', JSON.stringify({
+      fov: state.depth.fov, distance: state.depth.distance,
+    }));
+    if (change.key === 'restoreCamera' || change.group === 'reset') localStorage.removeItem('particleCameraView');
+    orbit.enabled = state.depth.inspect;
+    pointerInput.setSuspended(state.depth.inspect);
+    if (change.group === 'reset' || ['fov', 'distance', 'inspect', 'restoreCamera'].includes(change.key)) applyCameraView();
+  }
+  particles.count = Math.min(PARTICLE_CAPACITY, Math.round(DEFAULT_PARTICLE_COUNT * state.field.density));
+  if (change.group !== 'bead' && !(change.group === 'field' && ['size', 'density'].includes(change.key))
+      && !(change.group === 'depth' && ['fov', 'distance', 'inspect', 'saveCamera', 'restoreCamera'].includes(change.key))) {
+    compositionDirty = true;
+    preserveWorldPosition = change.group !== 'depth';
+  }
+}
+
+window.addEventListener('message', (event) => {
+  if (event.origin !== location.origin || event.data?.type !== 'nocturne:particle-controls') return;
+  document.body.classList.toggle('particle-controls-open', Boolean(event.data.open));
+});
+
+function mountParticleControls() {
+  const dock = document.querySelector('.appearance-dock');
+  const physics = document.querySelector('.physics-editor');
+  const lookPanel = document.querySelector('.look-editor');
+  const arrange = () => dock.insertBefore(physics, lookPanel);
+  arrange();
+  matchMedia('(max-width: 800px)').addEventListener('change', () => queueMicrotask(arrange));
+  const panels = [...dock.querySelectorAll(':scope > .composition-editor details')];
+  for (const panel of panels) {
+    panel.open = false;
+    panel.addEventListener('toggle', () => {
+      if (panel.open) for (const other of panels) if (other !== panel) other.open = false;
+    });
+  }
+  document.documentElement.dataset.particleControls = 'ready';
+  window.parent.postMessage({ type: 'nocturne:particle-controls-ready' }, location.origin);
+}
+
 try {
   await renderer.init();
   if (!renderer.backend.isWebGPUBackend) throw new Error('A native WebGPU backend is required.');
@@ -268,6 +335,10 @@ try {
   const start = performance.now();
   let previousFrame = start;
   applyCameraView();
+  createCompositionEditor(settings, applyEditorSettings);
+  const physicsEditor = createPhysicsEditor(physicsSettings, applyPhysicsSettings);
+  createLookEditor(look.settings, look.apply);
+  mountParticleControls();
   renderer.setAnimationLoop(() => {
     const now = performance.now();
     const dt = Math.min(Math.max((now - previousFrame) / 1000, 0.001), 1 / 30);
@@ -278,7 +349,20 @@ try {
     }
     elapsed.value = (now - start) / 1000;
     frameDelta.value = dt;
-    pointerInput.update(dt, now);
+    const speed = pointerInput.update(dt, now);
+    const normalizedSpeed = speed * physicsSettings.mouseVelocityMultiplier * physicsSettings.sensitivity / 20;
+    const fraction = Math.min(Math.pow(normalizedSpeed, physicsSettings.velocityCurve), 1);
+    const gateT = Math.min(normalizedSpeed / 0.04, 1);
+    const gate = gateT * gateT * (3 - 2 * gateT);
+    const force = (Math.min(physicsSettings.baseForce, physicsSettings.maxForce) * (1 - fraction)
+      + physicsSettings.maxForce * fraction) * gate * physicsSettings.forceMultiplier
+      * physicsSettings.displacementScale * physicsSettings.particleVelocityMultiplier * pointerInput.uniforms.active.value;
+    physicsEditor.updateMeter(speed, force, fraction * pointerInput.uniforms.active.value, now);
+    if (compositionDirty) {
+      keepWorldPosition.value = preserveWorldPosition ? 1 : 0;
+      renderer.compute(initialize);
+      compositionDirty = false;
+    }
     renderer.compute(simulate);
     look.render();
   });

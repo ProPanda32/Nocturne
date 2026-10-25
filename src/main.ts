@@ -52,7 +52,8 @@ if (!app) throw new Error('Application root element was not found.')
 app.innerHTML = `
   <video class="hero-video" autoplay muted loop playsinline preload="auto" aria-hidden="true">
   </video>
-  <iframe class="particle-layer" src="./particle.html" title="Nocturne particle field" aria-hidden="true" tabindex="-1"></iframe>
+  <iframe id="particle-layer" class="particle-layer" src="./particle.html" title="Nocturne particle field" aria-hidden="true" tabindex="-1"></iframe>
+  <button class="particle-settings-toggle" type="button" aria-controls="particle-layer" aria-expanded="false">Particle Settings</button>
   <div class="scene-layer" aria-label="Nocturne perfume bottle"></div>
   <p class="load-status" role="status">Loading bottle…</p>
   <details class="bottle-editor" open>
@@ -67,6 +68,26 @@ app.innerHTML = `
     </div>
   </details>
 `
+
+const particleFrame = app.querySelector<HTMLIFrameElement>('.particle-layer')!
+const particleToggle = app.querySelector<HTMLButtonElement>('.particle-settings-toggle')!
+let particleControlsOpen = false
+const syncParticleControls = () => {
+  particleToggle.setAttribute('aria-expanded', String(particleControlsOpen))
+  particleToggle.textContent = particleControlsOpen ? 'Close Particle Settings' : 'Particle Settings'
+  particleFrame.setAttribute('aria-hidden', String(!particleControlsOpen))
+  particleFrame.tabIndex = particleControlsOpen ? 0 : -1
+  particleFrame.contentWindow?.postMessage({ type: 'nocturne:particle-controls', open: particleControlsOpen }, location.origin)
+}
+particleToggle.addEventListener('click', () => {
+  particleControlsOpen = !particleControlsOpen
+  syncParticleControls()
+})
+particleFrame.addEventListener('load', syncParticleControls)
+window.addEventListener('message', (event) => {
+  if (event.origin === location.origin && event.source === particleFrame.contentWindow
+      && event.data?.type === 'nocturne:particle-controls-ready') syncParticleControls()
+})
 
 const sceneLayer = app.querySelector<HTMLDivElement>('.scene-layer')!
 const loadStatus = app.querySelector<HTMLParagraphElement>('.load-status')!

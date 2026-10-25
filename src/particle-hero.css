@@ -1,9 +1,28 @@
-html, body, #app {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  overflow: hidden;
-  background: transparent;
+@import '../Public/Assets/Nocturne-Particle-Engine-v1/src/style.css';
+
+html, body, #app { background: transparent; }
+#app canvas { width: 100%; height: 100%; }
+body:not(.particle-controls-open) .appearance-dock { display: none; }
+.appearance-dock {
+  left: 16px;
+  right: auto;
+  top: 70px;
+  width: min(348px, calc(100vw - 32px));
+  max-height: calc(100dvh - 86px);
+  overflow-y: auto;
 }
-canvas { display: block; width: 100%; height: 100%; }
-.interaction-radius { display: none; }
+.appearance-dock > .composition-editor > details {
+  max-height: calc(100dvh - 140px);
+}
+@media (max-width: 800px) {
+  .appearance-dock {
+    left: 10px;
+    right: auto;
+    top: 60px;
+    width: min(340px, calc(100vw - 20px));
+    max-height: min(60dvh, calc(100dvh - 110px));
+  }
+  .appearance-dock > .composition-editor > details {
+    max-height: min(58dvh, calc(100dvh - 130px));
+  }
+}
