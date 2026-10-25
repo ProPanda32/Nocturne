@@ -51,7 +51,6 @@ if (!app) throw new Error('Application root element was not found.')
 
 app.innerHTML = `
   <video class="hero-video" autoplay muted loop playsinline preload="auto" aria-hidden="true">
-    <source src="/Assets/Video/Background%20Final%20Video.mp4" type="video/mp4" />
   </video>
   <div class="scene-layer" aria-label="Nocturne perfume bottle"></div>
   <p class="load-status" role="status">Loading bottle…</p>
@@ -73,6 +72,7 @@ const loadStatus = app.querySelector<HTMLParagraphElement>('.load-status')!
 const controlList = app.querySelector<HTMLDivElement>('.control-list')!
 const editorMessage = app.querySelector<HTMLParagraphElement>('.editor-message')!
 const video = app.querySelector<HTMLVideoElement>('.hero-video')!
+video.src = new URL('../Public/Assets/Video/Background Final Video.mp4', import.meta.url).href
 
 video.play().catch(() => {
   loadStatus.textContent = 'Tap to play the background video.'
@@ -185,7 +185,7 @@ app.querySelector<HTMLButtonElement>('[data-action="copy"]')!.addEventListener('
 })
 
 new GLTFLoader().load(
-  '/Assets/Models/nocturne-bottle.glb',
+  new URL('../Public/Assets/Models/nocturne-bottle.glb', import.meta.url).href,
   (gltf) => {
     const bottle = gltf.scene
     const bounds = new THREE.Box3().setFromObject(bottle)

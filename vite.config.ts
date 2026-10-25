@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 
 export default defineConfig({
-  publicDir: 'Public',
+  publicDir: false,
   server: { host: true },
 })
