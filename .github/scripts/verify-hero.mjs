@@ -3,7 +3,11 @@ import { mkdir } from 'node:fs/promises'
 
 const browser = await chromium.launch({
   channel: 'chrome',
-  args: ['--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--autoplay-policy=no-user-gesture-required'],
+  args: [
+    '--enable-webgl', '--enable-unsafe-webgpu', '--enable-features=Vulkan',
+    '--use-angle=vulkan', '--use-vulkan=swiftshader', '--use-webgpu-adapter=swiftshader',
+    '--disable-vulkan-surface', '--autoplay-policy=no-user-gesture-required',
+  ],
 })
 const context = await browser.newContext({
   viewport: { width: 1440, height: 900 },
@@ -36,6 +40,14 @@ try {
     errors,
   }))
 }
+await page.waitForFunction(() => {
+  const frame = document.querySelector('.particle-layer')
+  return ['ready', 'unavailable'].includes(frame?.contentDocument?.documentElement.dataset.particles)
+}, null, { timeout: 120000 })
+const particleState = await page.frameLocator('.particle-layer').locator('html').getAttribute('data-particles')
+console.log('Particle engine state:', particleState)
+if (particleState !== 'ready') throw new Error('Particle engine did not start: ' + errors.join('; '))
+await page.waitForTimeout(2000)
 await mkdir('.github/preview', { recursive: true })
 await page.screenshot({ path: '.github/preview/diagnostic.png', fullPage: true })
 const media = await page.evaluate(() => {
