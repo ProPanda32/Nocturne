@@ -1,0 +1,264 @@
+{
+  "initial": {
+    "backend": true,
+    "count": 70000,
+    "meshes": 1,
+    "controls": 24,
+    "idle": {
+      "rms": 0,
+      "peak": 0,
+      "affected": 0,
+      "finite": true
+    }
+  },
+  "controls": [
+    {
+      "key": "radius",
+      "uniform": 7,
+      "maxDifference": 36.50928473472595,
+      "rms": 12.784406669188341,
+      "peak": 71.53578142221937,
+      "affected": 28774,
+      "finite": true
+    },
+    {
+      "key": "depth",
+      "uniform": 3,
+      "maxDifference": 50.411563873291016,
+      "rms": 2.1853799374715575,
+      "peak": 33.677513513333416,
+      "affected": 3892,
+      "finite": true
+    },
+    {
+      "key": "baseForce",
+      "uniform": 100,
+      "maxDifference": 17.31507110595703,
+      "rms": 6.247246081765442,
+      "peak": 72.70718574904224,
+      "affected": 9811,
+      "finite": true
+    },
+    {
+      "key": "maxForce",
+      "uniform": 4000,
+      "maxDifference": 46.89846611022949,
+      "rms": 8.08889815773869,
+      "peak": 93.15319026051947,
+      "affected": 9837,
+      "finite": true
+    },
+    {
+      "key": "forceMultiplier",
+      "uniform": 2,
+      "maxDifference": 41.53983116149902,
+      "rms": 7.679505932659053,
+      "peak": 88.2308867860051,
+      "affected": 9834,
+      "finite": true
+    },
+    {
+      "key": "displacementScale",
+      "uniform": 2,
+      "maxDifference": 41.53983116149902,
+      "rms": 7.679505932659053,
+      "peak": 88.2308867860051,
+      "affected": 9834,
+      "finite": true
+    },
+    {
+      "key": "maxDisplacement",
+      "uniform": 1,
+      "maxDifference": 51.77166199684143,
+      "rms": 0.31315747977933117,
+      "peak": 1.5287098777003834,
+      "affected": 9799,
+      "finite": true
+    },
+    {
+      "key": "falloff",
+      "uniform": 4,
+      "maxDifference": 34.55328580737114,
+      "rms": 3.336892468664442,
+      "peak": 52.57947992646462,
+      "affected": 7910,
+      "finite": true
+    },
+    {
+      "key": "sensitivity",
+      "uniform": 2,
+      "maxDifference": 111.24322986602783,
+      "rms": 12.427241459259193,
+      "peak": 138.29124405979175,
+      "affected": 9867,
+      "finite": true
+    },
+    {
+      "key": "mouseVelocityMultiplier",
+      "uniform": 2,
+      "maxDifference": 111.24322986602783,
+      "rms": 12.427241459259193,
+      "peak": 138.29124405979175,
+      "affected": 9867,
+      "finite": true
+    },
+    {
+      "key": "velocityCurve",
+      "uniform": 4,
+      "maxDifference": 39.69497585296631,
+      "rms": 2.890711004320904,
+      "peak": 25.64053925529533,
+      "affected": 9708,
+      "finite": true
+    },
+    {
+      "key": "particleVelocityMultiplier",
+      "uniform": 2,
+      "maxDifference": 41.53983116149902,
+      "rms": 7.679505932659053,
+      "peak": 88.2308867860051,
+      "affected": 9834,
+      "finite": true
+    },
+    {
+      "key": "maxVelocity",
+      "uniform": 2,
+      "maxDifference": 49.84508442878723,
+      "rms": 0.8390939792448039,
+      "peak": 3.672757274642387,
+      "affected": 9799,
+      "finite": true
+    },
+    {
+      "key": "momentum",
+      "uniform": 0,
+      "maxDifference": 35.56652355194092,
+      "rms": 1.6268510973000936,
+      "peak": 19.069842236671317,
+      "affected": 9708,
+      "finite": true
+    },
+    {
+      "key": "drag",
+      "uniform": 6,
+      "maxDifference": 39.259217262268066,
+      "rms": 1.2051536808883279,
+      "peak": 13.606707457788517,
+      "affected": 9683,
+      "finite": true
+    },
+    {
+      "key": "returnStrength",
+      "uniform": 10,
+      "maxDifference": 37.77673816680908,
+      "rms": 0.9638453250364967,
+      "peak": 15.444963312317107,
+      "affected": 9706,
+      "finite": true
+    },
+    {
+      "key": "returnDamping",
+      "uniform": 2,
+      "maxDifference": 2.7145538330078125,
+      "rms": 5.1668249077278805,
+      "peak": 58.81537119285321,
+      "affected": 9794,
+      "finite": true
+    },
+    {
+      "key": "returnDelay",
+      "uniform": 4,
+      "maxDifference": 11.820884704589844,
+      "rms": 6.9307606246611515,
+      "peak": 74.97129068043616,
+      "affected": 9808,
+      "finite": true
+    },
+    {
+      "key": "radialPush",
+      "uniform": 2,
+      "maxDifference": 65.79989528656006,
+      "rms": 5.751419497045837,
+      "peak": 80.46545582662831,
+      "affected": 9828,
+      "finite": true
+    },
+    {
+      "key": "directionalPush",
+      "uniform": 0,
+      "maxDifference": 65.67658519744873,
+      "rms": 3.3264654744180113,
+      "peak": 47.44174916248778,
+      "affected": 9762,
+      "finite": true
+    },
+    {
+      "key": "turbulenceStrength",
+      "uniform": 10,
+      "maxDifference": 6.916919946670532,
+      "rms": 5.642934013656063,
+      "peak": 61.216278989372185,
+      "affected": 9799,
+      "finite": true
+    },
+    {
+      "key": "turbulenceScale",
+      "uniform": 2,
+      "maxDifference": 4.45124626159668,
+      "rms": 5.438860746277479,
+      "peak": 62.38025777172603,
+      "affected": 9799,
+      "finite": true
+    },
+    {
+      "key": "turbulenceSpeed",
+      "uniform": 4,
+      "maxDifference": 3.179889678955078,
+      "rms": 5.441463258593895,
+      "peak": 62.43365190204383,
+      "affected": 9799,
+      "finite": true
+    }
+  ],
+  "behavior": {
+    "slow": {
+      "rms": 0.0030250104413759825,
+      "peak": 0.021297041916953533,
+      "affected": 6760,
+      "finite": true
+    },
+    "fast": {
+      "rms": 3.1372939730603493,
+      "peak": 29.28537481856124,
+      "affected": 9753,
+      "finite": true
+    },
+    "coastDelta": 4.881913185119629,
+    "peakReturn": {
+      "rms": 14.030979517990009,
+      "peak": 139.0434014522052,
+      "affected": 9853,
+      "finite": true
+    },
+    "restored": {
+      "rms": 0.002071561157360954,
+      "peak": 0.02194182749441303,
+      "affected": 7100,
+      "finite": true
+    },
+    "homesUnchanged": true,
+    "appearanceUnchanged": true,
+    "sharp": 61.98070521808937,
+    "smoothed": 2.061851112547069,
+    "frozenActive": 0,
+    "radiusVisible": true,
+    "radiusWidth": 701.481,
+    "radiusHidden": true,
+    "resetDoesNotMove": true,
+    "resetPreservesComposition": true,
+    "resetRestoresDefaults": true,
+    "exportedAll": true,
+    "cpuPositionsUntouched": true
+  },
+  "errors": []
+}

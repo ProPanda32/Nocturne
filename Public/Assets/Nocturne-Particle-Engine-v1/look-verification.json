@@ -1,0 +1,403 @@
+{
+  "originalDifference": {
+    "mean": 0.000004372427983539094,
+    "changed": 17
+  },
+  "initial": {
+    "sliders": 49,
+    "swatches": 6,
+    "count": 70000,
+    "visibleMeshes": 1,
+    "webgpu": true
+  },
+  "controls": [
+    {
+      "key": "paletteBlend",
+      "value": 0,
+      "difference": 0.6816260288065844,
+      "changed": 1027703
+    },
+    {
+      "key": "paletteRandomness",
+      "value": 0.15,
+      "difference": 3.3850702160493826,
+      "changed": 1207913
+    },
+    {
+      "key": "saturation",
+      "value": 0,
+      "difference": 4.345288580246914,
+      "changed": 1231064
+    },
+    {
+      "key": "brightness",
+      "value": 0.5,
+      "difference": 14.03089866255144,
+      "changed": 1305615
+    },
+    {
+      "key": "exposure",
+      "value": 1,
+      "difference": 14.157419753086419,
+      "changed": 1232029
+    },
+    {
+      "key": "contrast",
+      "value": 2,
+      "difference": 9.391831532921811,
+      "changed": 1244926
+    },
+    {
+      "key": "colorIntensity",
+      "value": 0,
+      "difference": 4.345288580246914,
+      "changed": 1231064
+    },
+    {
+      "key": "temperature",
+      "value": -1,
+      "difference": 4.427757201646091,
+      "changed": 1256877
+    },
+    {
+      "key": "hueVariation",
+      "value": 0.3,
+      "difference": 1.8926381172839506,
+      "changed": 1149121
+    },
+    {
+      "key": "saturationVariation",
+      "value": 0.8,
+      "difference": 2.0254809670781895,
+      "changed": 1036920
+    },
+    {
+      "key": "brightnessVariation",
+      "value": 0.8,
+      "difference": 5.829426183127572,
+      "changed": 1229135
+    },
+    {
+      "key": "variationScale",
+      "value": 6,
+      "difference": 6.074430298353909,
+      "changed": 1231594
+    },
+    {
+      "key": "verticalInfluence",
+      "value": 1,
+      "difference": 1.5829616769547326,
+      "changed": 1152196
+    },
+    {
+      "key": "horizontalInfluence",
+      "value": 1,
+      "difference": 1.478507973251029,
+      "changed": 1156094
+    },
+    {
+      "key": "depthInfluence",
+      "value": 1,
+      "difference": 1.5445180041152264,
+      "changed": 1141041
+    },
+    {
+      "key": "lightX",
+      "value": 0.8,
+      "difference": 14.076756430041153,
+      "changed": 1240888
+    },
+    {
+      "key": "lightY",
+      "value": -0.8,
+      "difference": 15.99754861111111,
+      "changed": 1266958
+    },
+    {
+      "key": "lightZ",
+      "value": -0.5,
+      "difference": 16.081362139917694,
+      "changed": 1119132
+    },
+    {
+      "key": "keyIntensity",
+      "value": 2,
+      "difference": 7.493756687242798,
+      "changed": 1046275
+    },
+    {
+      "key": "ambient",
+      "value": 0.6,
+      "difference": 9.169137345679012,
+      "changed": 1231676
+    },
+    {
+      "key": "shadowDarkness",
+      "value": 2.2,
+      "difference": 8.867581018518518,
+      "changed": 1221086
+    },
+    {
+      "key": "roughness",
+      "value": 0.9,
+      "difference": 2.1376548353909466,
+      "changed": 896533
+    },
+    {
+      "key": "specularStrength",
+      "value": 0,
+      "difference": 2.9713042695473253,
+      "changed": 950052
+    },
+    {
+      "key": "metallic",
+      "value": 1,
+      "difference": 6.336316358024692,
+      "changed": 1277865
+    },
+    {
+      "key": "fresnel",
+      "value": 0.8,
+      "difference": 3.3251337448559672,
+      "changed": 970609
+    },
+    {
+      "key": "highlightStrength",
+      "value": 2,
+      "difference": 1.8657235082304526,
+      "changed": 880759
+    },
+    {
+      "key": "highlightSize",
+      "value": 2.5,
+      "difference": 1.4826026234567902,
+      "changed": 671483
+    },
+    {
+      "key": "highlightSharpness",
+      "value": 3,
+      "difference": 0.6735776748971194,
+      "changed": 352637
+    },
+    {
+      "key": "highlightX",
+      "value": 0.7,
+      "difference": 4.495039866255144,
+      "changed": 1083893
+    },
+    {
+      "key": "highlightY",
+      "value": -0.7,
+      "difference": 4.807520833333333,
+      "changed": 1116711
+    },
+    {
+      "key": "highlightZ",
+      "value": -0.6,
+      "difference": 2.7370375514403293,
+      "changed": 920347
+    },
+    {
+      "key": "glowIntensity",
+      "value": 0.8,
+      "difference": 41.58951774691358,
+      "changed": 2653455
+    },
+    {
+      "key": "glowRadius",
+      "value": 4,
+      "difference": 56.2538554526749,
+      "changed": 3466795
+    },
+    {
+      "key": "glowSoftness",
+      "value": 0.15,
+      "difference": 4.873499228395062,
+      "changed": 2314267
+    },
+    {
+      "key": "glowColorInfluence",
+      "value": 0,
+      "difference": 5.233597479423868,
+      "changed": 2379651
+    },
+    {
+      "key": "glowThreshold",
+      "value": 2,
+      "difference": 40.19747762345679,
+      "changed": 2631481
+    },
+    {
+      "key": "glowResponse",
+      "value": 3,
+      "difference": 20.345268004115226,
+      "changed": 2374544
+    },
+    {
+      "key": "bloomStrength",
+      "value": 0.5,
+      "difference": 27.137291666666666,
+      "changed": 3809321
+    },
+    {
+      "key": "bloomThreshold",
+      "value": 2,
+      "difference": 27.137291666666666,
+      "changed": 3809321
+    },
+    {
+      "key": "bloomRadius",
+      "value": 0.95,
+      "difference": 3.950412808641975,
+      "changed": 3448838
+    },
+    {
+      "key": "depthBrightness",
+      "value": 1,
+      "difference": 7.493842592592593,
+      "changed": 1218832
+    },
+    {
+      "key": "depthSaturation",
+      "value": 0.8,
+      "difference": 2.0887903806584363,
+      "changed": 1042630
+    },
+    {
+      "key": "depthGlow",
+      "value": 1,
+      "difference": 8.866454475308641,
+      "changed": 2482617
+    },
+    {
+      "key": "depthContrast",
+      "value": 1,
+      "difference": 5.376789351851852,
+      "changed": 1206404
+    },
+    {
+      "key": "rimStrength",
+      "value": 1,
+      "difference": 0.10464171810699588,
+      "changed": 58485
+    },
+    {
+      "key": "rimX",
+      "value": -0.8,
+      "difference": 0.17021887860082305,
+      "changed": 101077
+    },
+    {
+      "key": "rimY",
+      "value": -0.8,
+      "difference": 0.12458101851851852,
+      "changed": 79199
+    },
+    {
+      "key": "rimZ",
+      "value": 0.8,
+      "difference": 0.013469907407407408,
+      "changed": 34476
+    },
+    {
+      "key": "rimWidth",
+      "value": 0.8,
+      "difference": 1.6494619341563785,
+      "changed": 398401
+    },
+    {
+      "key": "palette 0 color",
+      "difference": 0.6913302469135802
+    },
+    {
+      "key": "palette 0 enabled",
+      "difference": 0.842857767489712
+    },
+    {
+      "key": "palette 0 weight",
+      "difference": 0.9278153292181069
+    },
+    {
+      "key": "palette 1 color",
+      "difference": 1.538298353909465
+    },
+    {
+      "key": "palette 1 enabled",
+      "difference": 0.6833117283950617
+    },
+    {
+      "key": "palette 1 weight",
+      "difference": 1.3005807613168725
+    },
+    {
+      "key": "palette 2 color",
+      "difference": 1.907073559670782
+    },
+    {
+      "key": "palette 2 enabled",
+      "difference": 0.4313400205761317
+    },
+    {
+      "key": "palette 2 weight",
+      "difference": 0.7865354938271605
+    },
+    {
+      "key": "palette 3 color",
+      "difference": 2.851776234567901
+    },
+    {
+      "key": "palette 3 enabled",
+      "difference": 0.38979140946502056
+    },
+    {
+      "key": "palette 3 weight",
+      "difference": 0.5721574074074074
+    },
+    {
+      "key": "palette 4 color",
+      "difference": 5.1429246399176956
+    },
+    {
+      "key": "palette 4 enabled",
+      "difference": 0.9406710390946502
+    },
+    {
+      "key": "palette 4 weight",
+      "difference": 1.0673585390946503
+    },
+    {
+      "key": "palette 5 color",
+      "difference": 4.246158950617284
+    },
+    {
+      "key": "palette 5 enabled",
+      "difference": 1.6213963477366256
+    },
+    {
+      "key": "palette 5 weight",
+      "difference": 1.002534465020576
+    },
+    {
+      "key": "highlightColor",
+      "difference": 1.419233024691358
+    },
+    {
+      "key": "rimColor",
+      "difference": 0.06600411522633745
+    }
+  ],
+  "paletteEdges": {
+    "fallbackFinite": true,
+    "singleSlot": true
+  },
+  "isolation": {
+    "stateUnchanged": true,
+    "exportComplete": true,
+    "resetExact": true,
+    "halosDisabled": true,
+    "cpuPositionsUntouched": true,
+    "count": 70000
+  },
+  "trajectoryIdentical": true,
+  "errors": []
+}
