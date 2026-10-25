@@ -72,7 +72,7 @@ const loadStatus = app.querySelector<HTMLParagraphElement>('.load-status')!
 const controlList = app.querySelector<HTMLDivElement>('.control-list')!
 const editorMessage = app.querySelector<HTMLParagraphElement>('.editor-message')!
 const video = app.querySelector<HTMLVideoElement>('.hero-video')!
-video.src = new URL('../Public/Assets/Video/Background Final Video.mp4', import.meta.url).href
+video.src = new URL('../Public/Assets/Video/Background Final Video.web.mp4', import.meta.url).href
 
 video.play().catch(() => {
   loadStatus.textContent = 'Tap to play the background video.'

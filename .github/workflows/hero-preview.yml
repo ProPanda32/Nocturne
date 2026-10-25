@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -24,6 +24,16 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg
           ffprobe -v error -show_entries stream=codec_name,codec_type,width,height,pix_fmt -of json 'Public/Assets/Video/Background Final Video.mp4'
+      - name: Prepare browser video
+        run: |
+          if [ ! -f 'Public/Assets/Video/Background Final Video.web.mp4' ]; then
+            ffmpeg -y -i 'Public/Assets/Video/Background Final Video.mp4' -map 0:v:0 -vf scale=1920:-2 -an -c:v libx264 -preset medium -crf 21 -pix_fmt yuv420p -movflags +faststart 'Public/Assets/Video/Background Final Video.web.mp4'
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add 'Public/Assets/Video/Background Final Video.web.mp4'
+            git commit -m 'Add browser compatible final background video'
+            git push origin HEAD:main
+          fi
       - name: Build
         run: npm run build
       - name: Install browser
