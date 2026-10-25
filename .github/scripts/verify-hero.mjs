@@ -23,11 +23,20 @@ for (let attempt = 0; attempt < 30; attempt++) {
 }
 
 await page.locator('.load-status').waitFor({ state: 'detached', timeout: 45000 })
-await page.waitForFunction(() => {
+await mkdir('.github/preview', { recursive: true })
+await page.screenshot({ path: '.github/preview/diagnostic.png', fullPage: true })
+const media = await page.evaluate(() => {
   const video = document.querySelector('video')
   const canvas = document.querySelector('canvas')
-  return video && video.readyState >= 2 && canvas && canvas.width > 0 && canvas.height > 0
-}, null, { timeout: 45000 })
+  return {
+    video: video && { src: video.currentSrc, readyState: video.readyState, networkState: video.networkState, error: video.error?.code, paused: video.paused, currentTime: video.currentTime, buffered: video.buffered.length },
+    canvas: canvas && { width: canvas.width, height: canvas.height },
+  }
+})
+console.log('Hero media state:', JSON.stringify(media))
+if (!media.video || media.video.readyState < 2 || !media.canvas || media.canvas.width === 0) {
+  throw new Error('Video or canvas did not load: ' + JSON.stringify(media) + '; browser errors: ' + errors.join('; '))
+}
 
 const fov = page.locator('[data-setting="cameraFov"]')
 await fov.evaluate((element) => {
