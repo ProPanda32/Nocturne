@@ -4,9 +4,9 @@ import { mkdir } from 'node:fs/promises'
 const browser = await chromium.launch({
   channel: 'chrome',
   args: [
-    '--enable-webgl', '--enable-unsafe-webgpu', '--enable-features=Vulkan',
-    '--use-angle=vulkan', '--use-vulkan=swiftshader', '--use-webgpu-adapter=swiftshader',
-    '--disable-vulkan-surface', '--autoplay-policy=no-user-gesture-required',
+    '--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader',
+    '--enable-unsafe-webgpu', '--use-webgpu-adapter=swiftshader',
+    '--autoplay-policy=no-user-gesture-required',
   ],
 })
 const context = await browser.newContext({
@@ -16,6 +16,7 @@ const context = await browser.newContext({
 const page = await context.newPage()
 const errors = []
 page.on('pageerror', (error) => errors.push(error.message))
+page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()) })
 page.on('response', (response) => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`) })
 
 for (let attempt = 0; attempt < 30; attempt++) {
@@ -28,7 +29,11 @@ for (let attempt = 0; attempt < 30; attempt++) {
   if (attempt === 29) throw new Error('Preview server did not start')
 }
 
-await page.locator('.load-status').waitFor({ state: 'detached', timeout: 45000 })
+try {
+  await page.locator('.load-status').waitFor({ state: 'detached', timeout: 45000 })
+} catch {
+  throw new Error('Bottle did not load: ' + errors.join('; '))
+}
 try {
   await page.frameLocator('.particle-layer').locator('canvas').waitFor({ state: 'attached', timeout: 12000 })
 } catch {
