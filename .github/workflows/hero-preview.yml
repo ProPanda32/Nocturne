@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -29,6 +29,16 @@ jobs:
         run: |
           npm run preview -- --host 127.0.0.1 > /tmp/nocturne-vite.log 2>&1 &
           node .github/scripts/verify-hero.mjs
+      - name: Publish preview screenshots
+        run: |
+          mkdir -p previews
+          cp .github/preview/desktop.png previews/hero-desktop.png
+          cp .github/preview/mobile.png previews/hero-mobile.png
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add previews/hero-desktop.png previews/hero-mobile.png
+          git commit -m 'Update hero preview screenshots'
+          git push origin HEAD:main
       - name: Save preview screenshots
         if: always()
         uses: actions/upload-artifact@v4
