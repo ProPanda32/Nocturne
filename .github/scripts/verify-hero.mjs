@@ -2,6 +2,7 @@ import { chromium } from 'playwright'
 import { mkdir } from 'node:fs/promises'
 
 const browser = await chromium.launch({
+  channel: 'chrome',
   args: ['--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--autoplay-policy=no-user-gesture-required'],
 })
 const context = await browser.newContext({
