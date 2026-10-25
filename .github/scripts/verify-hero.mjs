@@ -12,6 +12,7 @@ const context = await browser.newContext({
 const page = await context.newPage()
 const errors = []
 page.on('pageerror', (error) => errors.push(error.message))
+page.on('response', (response) => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`) })
 
 for (let attempt = 0; attempt < 30; attempt++) {
   try {
@@ -24,7 +25,17 @@ for (let attempt = 0; attempt < 30; attempt++) {
 }
 
 await page.locator('.load-status').waitFor({ state: 'detached', timeout: 45000 })
-await page.frameLocator('.particle-layer').locator('canvas').waitFor({ timeout: 45000 })
+try {
+  await page.frameLocator('.particle-layer').locator('canvas').waitFor({ state: 'attached', timeout: 12000 })
+} catch {
+  const frame = page.frameLocator('.particle-layer')
+  const body = await frame.locator('body').innerHTML().catch(() => '<unavailable>')
+  throw new Error('Particle frame did not create a canvas: ' + JSON.stringify({
+    frames: page.frames().map((item) => item.url()),
+    body: body.slice(0, 1000),
+    errors,
+  }))
+}
 await mkdir('.github/preview', { recursive: true })
 await page.screenshot({ path: '.github/preview/diagnostic.png', fullPage: true })
 const media = await page.evaluate(() => {
