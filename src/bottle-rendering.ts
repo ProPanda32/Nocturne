@@ -5,6 +5,7 @@ const LIQUID = 2
 const CRYSTAL = 3
 const LETTERING = 4
 const CAP_REFLECTOR = 5
+export const COMPOSITION_LAYER = 6
 
 type Role = 'glass' | 'cap' | 'liquid' | 'gold' | 'lettering' | 'meniscus' | 'tube' | 'facet'
 const roleFor = (name: string): Role => {
@@ -260,7 +261,7 @@ export function createBottleRendering(
       renderer.clear()
       quad.material = videoMaterial
       if (video.readyState >= 2) renderer.render(screen, screenCamera)
-      camera.layers.mask = 1 | (1 << CORE) | (1 << CAP_REFLECTOR)
+      camera.layers.mask = 1 | (1 << CORE) | (1 << CAP_REFLECTOR) | (1 << COMPOSITION_LAYER)
       renderer.render(scene, camera)
 
       renderer.setRenderTarget(interior)
@@ -273,7 +274,7 @@ export function createBottleRendering(
       renderer.setRenderTarget(oldTarget)
       renderer.setClearColor(clearColor, oldAlpha)
       renderer.clear()
-      camera.layers.mask = 1 | (1 << CORE) | (1 << CRYSTAL) | (1 << LETTERING)
+      camera.layers.mask = 1 | (1 << CORE) | (1 << CRYSTAL) | (1 << LETTERING) | (1 << COMPOSITION_LAYER)
       renderer.render(scene, camera)
     } finally {
       scene.overrideMaterial = oldOverride

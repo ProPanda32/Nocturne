@@ -59,6 +59,8 @@ try {
       input.dispatchEvent(new Event('input', { bubbles: true }))
     }, value)
   }
+  await page.locator('.header-studio').click()
+  await page.locator('.bottle-editor summary').click()
   await set('rotationY', 24)
   await set('rotationX', 8)
   await set('cameraFov', 42)
@@ -74,6 +76,7 @@ try {
   assert.equal(await page.locator('[data-setting="rotationY"]').inputValue(), '0')
   assert.equal(await page.locator('[data-setting="cameraFov"]').inputValue(), '35')
   await page.evaluate(() => { document.querySelector('.bottle-editor').open = false })
+  await page.locator('.studio-close').click()
   if (!fullHero) await page.screenshot({ path: resolve(output, 'desktop.png') })
   await page.setViewportSize({ width: 390, height: 844 })
   await page.waitForFunction(() => document.querySelector('.scene-layer canvas').getBoundingClientRect().width === innerWidth)

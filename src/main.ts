@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { createBottleRendering } from './bottle-rendering'
+import { createSphereComposition, sphereDefaults, type SphereSettings } from './sphere-composition'
 import './style.css'
 
 type Settings = {
@@ -50,24 +51,126 @@ const app = document.querySelector<HTMLDivElement>('#app')
 if (!app) throw new Error('Application root element was not found.')
 
 app.innerHTML = `
-  <video class="hero-video" autoplay muted loop playsinline preload="auto" aria-hidden="true">
-  </video>
-  <iframe id="particle-layer" class="particle-layer" src="./particle.html" title="Nocturne particle field" aria-hidden="true" tabindex="-1"></iframe>
-  <button class="particle-settings-toggle" type="button" aria-controls="particle-layer" aria-expanded="false">Particle Settings</button>
-  <div class="scene-layer" aria-label="Nocturne perfume bottle"></div>
-  <p class="load-status" role="status">Loading bottle…</p>
-  <details class="bottle-editor" open>
-    <summary>Bottle Editor <span>Temporary controls</span></summary>
-    <div class="editor-body">
-      <div class="control-list"></div>
-      <div class="editor-actions">
-        <button type="button" data-action="reset">Reset</button>
-        <button type="button" data-action="copy">Copy Settings</button>
+  <div class="entry-intro" aria-hidden="true"><span>NOCTURNE</span></div>
+  <a class="skip-link" href="#fragrance">Skip to the fragrance</a>
+  <header class="site-header">
+    <button class="header-menu" type="button" aria-label="Open menu" aria-haspopup="dialog" aria-controls="menu-dialog" aria-expanded="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg><span>Menu</span>
+    </button>
+    <a class="header-logo" href="#top" aria-label="Nocturne home">NOCTURNE</a>
+    <button class="header-studio" type="button" aria-controls="studio-panel" aria-expanded="false">Scene controls</button>
+  </header>
+  <main>
+    <section class="site-hero" id="top" aria-label="Nocturne perfume bottle experience">
+      <video class="hero-video" autoplay muted loop playsinline preload="auto" aria-hidden="true"></video>
+      <iframe id="particle-layer" class="particle-layer" src="./particle.html" title="Nocturne particle field" aria-hidden="true" tabindex="-1"></iframe>
+      <div class="scene-layer" aria-label="Interactive 3D Nocturne perfume bottle"></div>
+      <p class="load-status" role="status">Loading bottle…</p>
+      <div class="hero-copy">
+        <p class="hero-kicker">EAU DE PARFUM</p>
+        <h1>Enter Nocturne</h1>
+        <a href="#fragrance" class="hero-discover">Discover the fragrance <span aria-hidden="true">↗</span></a>
       </div>
-      <p class="editor-message" role="status" aria-live="polite"></p>
+    </section>
+    <section class="fragrance-section" id="fragrance" aria-labelledby="fragrance-title">
+      <p class="section-index">01 / THE FRAGRANCE</p>
+      <div class="fragrance-grid">
+        <div>
+          <p class="section-kicker">The Nocturne collection</p>
+          <h2 id="fragrance-title">Made for<br>the hours after dark.</h2>
+        </div>
+        <div class="fragrance-detail">
+          <p class="fragrance-name">NOCTURNE <span>EAU DE PARFUM</span></p>
+          <p>Deep amber held in sculpted crystal. A warm gold collar and a faceted cap catch the last light.</p>
+          <a href="#top" class="text-link">Explore the bottle <span aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+    </section>
+    <section class="story-section" id="story" aria-labelledby="story-title">
+      <p class="section-index">02 / THE WORLD OF NOCTURNE</p>
+      <div class="story-grid">
+        <h2 id="story-title">Light, held<br>in shadow.</h2>
+        <p>The bottle is the beginning of the experience: crystal, amber and gold moving through a midnight landscape. Turn your attention back to the hero to explore it in real time.</p>
+      </div>
+      <a href="#top" class="text-link">Return to the experience <span aria-hidden="true">↑</span></a>
+    </section>
+  </main>
+  <footer class="site-footer"><a href="#top" aria-label="Nocturne home">NOCTURNE</a><span>EAU DE PARFUM</span><a href="#top">Back to top ↑</a></footer>
+  <dialog class="menu-dialog" id="menu-dialog" aria-labelledby="menu-title">
+    <div class="menu-content">
+      <div class="menu-top"><h2 id="menu-title">Explore Nocturne</h2><button class="menu-close" type="button" aria-label="Close menu">×</button></div>
+      <nav class="menu-links" aria-label="Explore Nocturne">
+        <a href="#top">The experience</a>
+        <a href="#fragrance">The fragrance</a>
+        <a href="#story">The world of Nocturne</a>
+        <button type="button" class="menu-scene-controls">Scene controls</button>
+      </nav>
+      <p class="menu-signoff">NOCTURNE · EAU DE PARFUM</p>
     </div>
-  </details>
+  </dialog>
+  <aside class="studio-panel" id="studio-panel" aria-label="Scene controls" hidden>
+    <div class="studio-panel-head"><span>Scene controls</span><button class="studio-close" type="button" aria-label="Close scene controls">×</button></div>
+    <button class="particle-settings-toggle" type="button" aria-controls="particle-layer" aria-expanded="false">Particle Settings</button>
+    <details class="sphere-editor">
+      <summary>Sphere Settings <span>Temporary controls</span></summary>
+      <div class="editor-body">
+        <div class="sphere-control-list"></div>
+        <div class="editor-actions"><button type="button" data-sphere-action="reset">Reset Spheres</button></div>
+        <p class="sphere-editor-message" role="status" aria-live="polite"></p>
+      </div>
+    </details>
+    <details class="bottle-editor">
+      <summary>Bottle Editor <span>Temporary controls</span></summary>
+      <div class="editor-body">
+        <div class="control-list"></div>
+        <div class="editor-actions">
+          <button type="button" data-action="reset">Reset</button>
+          <button type="button" data-action="copy">Copy Settings</button>
+        </div>
+        <p class="editor-message" role="status" aria-live="polite"></p>
+      </div>
+    </details>
+  </aside>
 `
+
+const menu = app.querySelector<HTMLDialogElement>('.menu-dialog')!
+const menuToggle = app.querySelector<HTMLButtonElement>('.header-menu')!
+const studioPanel = app.querySelector<HTMLElement>('.studio-panel')!
+const studioToggle = app.querySelector<HTMLButtonElement>('.header-studio')!
+const setStudioOpen = (open: boolean) => {
+  studioPanel.hidden = !open
+  studioToggle.setAttribute('aria-expanded', String(open))
+  if (!open && particleControlsOpen) particleToggle.click()
+  if (open) app.querySelector<HTMLButtonElement>('.studio-close')!.focus()
+  else studioToggle.focus()
+}
+const closeMenu = () => {
+  menu.close()
+  menuToggle.setAttribute('aria-expanded', 'false')
+}
+menuToggle.addEventListener('click', () => {
+  if (!studioPanel.hidden) setStudioOpen(false)
+  menu.showModal()
+  menuToggle.setAttribute('aria-expanded', 'true')
+  app.querySelector<HTMLButtonElement>('.menu-close')!.focus()
+})
+app.querySelector<HTMLButtonElement>('.menu-close')!.addEventListener('click', closeMenu)
+menu.addEventListener('close', () => menuToggle.setAttribute('aria-expanded', 'false'))
+menu.addEventListener('click', (event) => { if (event.target === menu) closeMenu() })
+menu.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeMenu))
+app.querySelector<HTMLButtonElement>('.menu-scene-controls')!.addEventListener('click', () => {
+  closeMenu()
+  setStudioOpen(true)
+})
+studioToggle.addEventListener('click', () => setStudioOpen(studioPanel.hidden))
+app.querySelector<HTMLButtonElement>('.studio-close')!.addEventListener('click', () => setStudioOpen(false))
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !studioPanel.hidden) setStudioOpen(false)
+})
+const updateHeader = () => app.querySelector('.site-header')?.classList.toggle('is-scrolled', window.scrollY > window.innerHeight * 0.7)
+window.addEventListener('scroll', updateHeader, { passive: true })
+updateHeader()
+window.setTimeout(() => app.querySelector('.entry-intro')?.remove(), 1850)
 
 const particleFrame = app.querySelector<HTMLIFrameElement>('.particle-layer')!
 const particleToggle = app.querySelector<HTMLButtonElement>('.particle-settings-toggle')!
@@ -92,7 +195,9 @@ window.addEventListener('message', (event) => {
 const sceneLayer = app.querySelector<HTMLDivElement>('.scene-layer')!
 const loadStatus = app.querySelector<HTMLParagraphElement>('.load-status')!
 const controlList = app.querySelector<HTMLDivElement>('.control-list')!
+const sphereControlList = app.querySelector<HTMLDivElement>('.sphere-control-list')!
 const editorMessage = app.querySelector<HTMLParagraphElement>('.editor-message')!
+const sphereEditorMessage = app.querySelector<HTMLParagraphElement>('.sphere-editor-message')!
 const video = app.querySelector<HTMLVideoElement>('.hero-video')!
 video.src = new URL('../Public/Assets/Video/Background Final Video.web.mp4', import.meta.url).href
 
@@ -106,6 +211,21 @@ controlList.innerHTML = controls.map(({ key, label, min, max, step, unit }) => `
     <span class="control-heading"><span>${label}</span><output data-value="${key}"></output></span>
     <input type="range" data-setting="${key}" min="${min}" max="${max}" step="${step}" value="${settings[key]}" aria-label="${label}" />
     <span class="unit" aria-hidden="true">${unit ?? ''}</span>
+  </label>
+`).join('')
+
+const sphereSettings: SphereSettings = { ...sphereDefaults }
+const sphereControls: { key: keyof SphereSettings; label: string; min: number; max: number; step: number }[] = [
+  { key: 'count', label: 'Overall count', min: 30, max: 60, step: 1 },
+  { key: 'spread', label: 'Spread', min: 0.65, max: 1.7, step: 0.01 },
+  { key: 'scaleMin', label: 'Minimum scale', min: 0.03, max: 0.5, step: 0.01 },
+  { key: 'scaleMax', label: 'Maximum scale', min: 0.2, max: 1.1, step: 0.01 },
+  { key: 'depth', label: 'Depth', min: 1, max: 9, step: 0.1 },
+]
+sphereControlList.innerHTML = sphereControls.map(({ key, label, min, max, step }) => `
+  <label class="control">
+    <span class="control-heading"><span>${label}</span><output data-sphere-value="${key}"></output></span>
+    <input type="range" data-sphere-setting="${key}" min="${min}" max="${max}" step="${step}" value="${sphereSettings[key]}" aria-label="${label}" />
   </label>
 `).join('')
 
@@ -135,6 +255,7 @@ const bottleRoot = new THREE.Group()
 scene.add(bottleRoot)
 let bottleSize: THREE.Vector3 | null = null
 let baseScale = 1
+let sphereComposition: ReturnType<typeof createSphereComposition> | null = null
 
 function frameBottle() {
   if (!bottleSize) return
@@ -167,6 +288,20 @@ function applySettings() {
     input.value = String(settings[key])
     output.value = settings[key].toFixed(Number.isInteger(settings[key]) ? 0 : 2) + (unit ?? '')
   }
+  sphereComposition?.update(sphereSettings)
+}
+
+function applySphereSettings() {
+  if (sphereSettings.scaleMin > sphereSettings.scaleMax) {
+    sphereSettings.scaleMin = sphereSettings.scaleMax
+  }
+  sphereComposition?.update(sphereSettings)
+  for (const { key } of sphereControls) {
+    const input = sphereControlList.querySelector<HTMLInputElement>(`[data-sphere-setting="${key}"]`)!
+    const output = sphereControlList.querySelector<HTMLOutputElement>(`[data-sphere-value="${key}"]`)!
+    input.value = String(sphereSettings[key])
+    output.value = key === 'count' ? String(Math.round(sphereSettings[key])) : sphereSettings[key].toFixed(2)
+  }
 }
 
 function resize() {
@@ -186,6 +321,20 @@ controlList.addEventListener('input', (event) => {
   if (!key) return
   settings[key] = Number(input.value)
   applySettings()
+})
+
+sphereControlList.addEventListener('input', (event) => {
+  const input = event.target as HTMLInputElement
+  const key = input.dataset.sphereSetting as keyof SphereSettings | undefined
+  if (!key) return
+  sphereSettings[key] = Number(input.value)
+  applySphereSettings()
+})
+
+app.querySelector<HTMLButtonElement>('[data-sphere-action="reset"]')!.addEventListener('click', () => {
+  Object.assign(sphereSettings, sphereDefaults)
+  applySphereSettings()
+  sphereEditorMessage.textContent = 'Sphere settings reset.'
 })
 
 app.querySelector<HTMLButtonElement>('[data-action="reset"]')!.addEventListener('click', () => {
@@ -223,7 +372,23 @@ new GLTFLoader().load(
   },
 )
 
+new GLTFLoader().load(
+  new URL('../Public/Assets/Models/nocturne-spheres.glb', import.meta.url).href,
+  (gltf) => {
+    sphereComposition = createSphereComposition(scene, camera, gltf.scene)
+    applySphereSettings()
+  },
+  undefined,
+  (error) => {
+    console.error('Sphere loading failed:', error)
+    sphereEditorMessage.textContent = 'The sphere library could not be loaded.'
+  },
+)
+
 if (import.meta.env.DEV) {
-  Object.assign(window, { __nocturneBottle: { audit: bottleRendering.audit, renderer, scene, camera } })
+  Object.assign(window, {
+    __nocturneBottle: { audit: bottleRendering.audit, renderer, scene, camera },
+    __nocturneSpheres: { audit: () => sphereComposition?.audit(), settings: sphereSettings },
+  })
 }
 renderer.setAnimationLoop(bottleRendering.render)

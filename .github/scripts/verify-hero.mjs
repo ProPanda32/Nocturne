@@ -53,6 +53,14 @@ const particleState = await page.frameLocator('.particle-layer').locator('html')
 console.log('Particle engine state:', particleState)
 if (particleState !== 'ready') throw new Error('Particle engine did not start: ' + errors.join('; '))
 await page.waitForTimeout(2000)
+if (await page.title() !== 'Nocturne') throw new Error('Nocturne branding is missing')
+await page.locator('.header-menu').click()
+if (await page.locator('#menu-title').textContent() !== 'Explore Nocturne') {
+  throw new Error('Nocturne menu did not open')
+}
+await page.locator('.menu-close').click()
+await page.locator('.header-studio').click()
+await page.locator('.bottle-editor summary').click()
 await mkdir('.github/preview', { recursive: true })
 const media = await page.evaluate(() => {
   const video = document.querySelector('video')
@@ -101,6 +109,7 @@ await particleToggle.click()
 if (await particleToggle.getAttribute('aria-expanded') !== 'false') {
   throw new Error('Particle settings toggle did not close')
 }
+await page.locator('.studio-close').click()
 
 if (errors.length) throw new Error('Browser errors: ' + errors.join('; '))
 await mkdir('.github/preview', { recursive: true })
@@ -110,7 +119,7 @@ for (const [name, size] of [
 ]) {
   await page.setViewportSize(size)
   try {
-    await page.screenshot({ path: `.github/preview/${name}.png`, fullPage: true, timeout: 15000 })
+    await page.screenshot({ path: `.github/preview/${name}.png`, fullPage: false, timeout: 15000 })
   } catch (error) {
     console.warn(`Screenshot ${name} unavailable with software WebGPU:`, error.message)
   }
