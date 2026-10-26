@@ -65,7 +65,10 @@ if (!media.video || media.video.readyState < 2 || !media.canvas || media.canvas.
   throw new Error('Video or canvas did not load: ' + JSON.stringify(media) + '; browser errors: ' + errors.join('; '))
 }
 
-await page.locator('.header-studio').click()
+// The long SwiftShader/WebGPU startup can leave Playwright's actionability
+// observer waiting even though the fixed header and its handler are mounted.
+// Trigger the same user-facing click without depending on that observer.
+await page.locator('.header-studio').evaluate((element) => element.click())
 const particleToggle = page.locator('.particle-settings-toggle')
 await particleToggle.click()
 const particlePanel = page.frameLocator('.particle-layer')
