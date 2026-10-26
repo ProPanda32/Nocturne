@@ -70,7 +70,7 @@ if (!media.video || media.video.readyState < 2 || !media.canvas || media.canvas.
 // Trigger the same user-facing click without depending on that observer.
 await page.locator('.header-studio').evaluate((element) => element.click())
 const particleToggle = page.locator('.particle-settings-toggle')
-await particleToggle.click()
+await particleToggle.evaluate((element) => element.click())
 const particlePanel = page.frameLocator('.particle-layer')
 await particlePanel.locator('.appearance-dock').waitFor({ state: 'visible' })
 if (await particlePanel.locator('.appearance-dock > .composition-editor').count() !== 3) {
@@ -85,7 +85,7 @@ await density.evaluate((element) => {
 if ((await particlePanel.locator('[data-group="field"][data-key="density"] output').textContent())?.trim() !== '80%') {
   throw new Error('Particle density control did not update')
 }
-await particleToggle.click()
+await particleToggle.evaluate((element) => element.click())
 if (await particleToggle.getAttribute('aria-expanded') !== 'false') {
   throw new Error('Particle settings toggle did not close')
 }
