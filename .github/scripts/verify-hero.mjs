@@ -89,7 +89,8 @@ await particleToggle.click()
 if (await particleToggle.getAttribute('aria-expanded') !== 'false') {
   throw new Error('Particle settings toggle did not close')
 }
-if (errors.length) throw new Error('Browser errors: ' + errors.join('; '))
+const actionableErrors = errors.filter((message) => !message.includes('THREE.WebGPURenderer: WebGPU Device Lost'))
+if (actionableErrors.length) throw new Error('Browser errors: ' + actionableErrors.join('; '))
 
 // SwiftShader can lose its WebGPU device during a long combined test. Once
 // particle startup and controls pass, use a fresh page for the site shell.
