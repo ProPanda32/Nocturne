@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
+import { createBottleRendering } from './bottle-rendering'
 import './style.css'
 
 type Settings = {
@@ -27,8 +27,8 @@ const defaults: Settings = {
   rotationZ: 0,
   cameraFov: 35,
   cameraDistance: 5,
-  environmentIntensity: 1.2,
-  keyLightIntensity: 3.5,
+  environmentIntensity: 1,
+  keyLightIntensity: 1.8,
 }
 
 const settings: Settings = { ...defaults }
@@ -117,19 +117,17 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPr
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 renderer.outputColorSpace = THREE.SRGBColorSpace
 renderer.toneMapping = THREE.ACESFilmicToneMapping
-renderer.toneMappingExposure = 1.25
+renderer.toneMappingExposure = 1
 renderer.setClearColor(0x000000, 0)
 sceneLayer.append(renderer.domElement)
 
-const environment = new THREE.PMREMGenerator(renderer)
-scene.environment = environment.fromScene(new RoomEnvironment(), 0.04).texture
-environment.dispose()
+const bottleRendering = createBottleRendering(renderer, scene, camera, video)
 
 const keyLight = new THREE.DirectionalLight(0xffe9ce, defaults.keyLightIntensity)
 keyLight.position.set(-3, 5, 6)
 scene.add(keyLight)
 
-const fillLight = new THREE.DirectionalLight(0xc9d8ff, 1.4)
+const fillLight = new THREE.DirectionalLight(0xffe1b8, 0.45)
 fillLight.position.set(4, 2, -3)
 scene.add(fillLight)
 
@@ -174,7 +172,7 @@ function applySettings() {
 function resize() {
   const width = Math.max(sceneLayer.clientWidth, 1)
   const height = Math.max(sceneLayer.clientHeight, 1)
-  renderer.setSize(width, height)
+  renderer.setSize(width, height, false)
   camera.aspect = width / height
   camera.updateProjectionMatrix()
   frameBottle()
@@ -210,6 +208,7 @@ new GLTFLoader().load(
   new URL('../Public/Assets/Models/nocturne-bottle.glb', import.meta.url).href,
   (gltf) => {
     const bottle = gltf.scene
+    bottleRendering.configure(bottle)
     const bounds = new THREE.Box3().setFromObject(bottle)
     bottleSize = bounds.getSize(new THREE.Vector3())
     bottle.position.sub(bounds.getCenter(new THREE.Vector3()))
@@ -224,4 +223,7 @@ new GLTFLoader().load(
   },
 )
 
-renderer.setAnimationLoop(() => renderer.render(scene, camera))
+if (import.meta.env.DEV) {
+  Object.assign(window, { __nocturneBottle: { audit: bottleRendering.audit, renderer, scene, camera } })
+}
+renderer.setAnimationLoop(bottleRendering.render)
