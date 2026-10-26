@@ -73,9 +73,12 @@ const initialState = uniform(1);
 const physicsSettings = defaultPhysicsSettings();
 const physicsUniforms = Object.fromEntries(physicsFields.map(([key]) => [key, uniform(physicsSettings[key])]));
 const pointerInput = createPointerInput(renderer.domElement, camera, physicsSettings);
+let applyingSceneConfig = false;
+let particleEditors = null;
 function applyPhysicsSettings(state) {
   for (const [key, node] of Object.entries(physicsUniforms)) node.value = state[key];
   if (state.frozen) pointerInput.uniforms.active.value = 0;
+  emitParticleConfig();
 }
 
 function wingPosition(side, verticalDirection, t, volume, controls) {
@@ -252,11 +255,63 @@ function applyEditorSettings(state, change = { group: 'reset' }) {
     compositionDirty = true;
     preserveWorldPosition = change.group !== 'depth';
   }
+  emitParticleConfig();
+}
+
+function particleConfigSnapshot() {
+  return structuredClone({ composition: settings, physics: physicsSettings, appearance: look.settings });
+}
+
+function mergeCompatible(target, source) {
+  if (!source || typeof source !== 'object') return;
+  for (const key of Object.keys(target)) {
+    const saved = source[key];
+    if (saved === undefined || saved === null) continue;
+    if (Array.isArray(target[key])) {
+      if (!Array.isArray(saved)) continue;
+      target[key].forEach((item, index) => {
+        if (item && typeof item === 'object') mergeCompatible(item, saved[index]);
+        else if (typeof saved[index] === typeof item) target[key][index] = saved[index];
+      });
+    } else if (target[key] && typeof target[key] === 'object') mergeCompatible(target[key], saved);
+    else if (typeof saved === typeof target[key] && (typeof saved !== 'number' || Number.isFinite(saved))) target[key] = saved;
+  }
+}
+
+function emitParticleConfig() {
+  if (applyingSceneConfig || !particleEditors || window.parent === window) return;
+  window.parent.postMessage({ type: 'nocturne:particle-config-change', config: particleConfigSnapshot() }, location.origin);
+}
+
+function applyParticleSceneConfig(config) {
+  applyingSceneConfig = true;
+  try {
+    mergeCompatible(settings, config?.composition);
+    mergeCompatible(physicsSettings, config?.physics);
+    mergeCompatible(look.settings, config?.appearance);
+    applyEditorSettings(settings, { group: 'config' });
+    applyPhysicsSettings(physicsSettings);
+    look.apply(look.settings);
+    particleEditors?.composition.refresh();
+    particleEditors?.physics.refresh();
+    particleEditors?.look.refresh();
+  } finally {
+    applyingSceneConfig = false;
+  }
+  emitParticleConfig();
 }
 
 window.addEventListener('message', (event) => {
-  if (event.origin !== location.origin || event.data?.type !== 'nocturne:particle-controls') return;
-  document.body.classList.toggle('particle-controls-open', Boolean(event.data.open));
+  if (event.origin !== location.origin) return;
+  if (event.data?.type === 'nocturne:particle-controls') {
+    document.body.classList.toggle('particle-controls-open', Boolean(event.data.open));
+  } else if (event.data?.type === 'nocturne:scene-config-apply') {
+    applyParticleSceneConfig(event.data.config);
+  } else if (event.data?.type === 'nocturne:particle-config-request') {
+    window.parent.postMessage({
+      type: 'nocturne:particle-config-response', requestId: event.data.requestId, config: particleConfigSnapshot(),
+    }, location.origin);
+  }
 });
 
 function mountParticleControls() {
@@ -285,9 +340,10 @@ try {
   const start = performance.now();
   let previousFrame = start;
   applyCameraView();
-  createCompositionEditor(settings, applyEditorSettings);
+  const compositionEditor = createCompositionEditor(settings, applyEditorSettings);
   const physicsEditor = createPhysicsEditor(physicsSettings, applyPhysicsSettings);
-  createLookEditor(look.settings, look.apply);
+  const lookEditor = createLookEditor(look.settings, (state) => { look.apply(state); emitParticleConfig(); });
+  particleEditors = { composition: compositionEditor, physics: physicsEditor, look: lookEditor };
   mountParticleControls();
   renderer.setAnimationLoop(() => {
     const now = performance.now();

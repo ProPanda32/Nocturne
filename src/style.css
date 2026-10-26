@@ -117,6 +117,14 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .studio-panel[hidden] { display: none; }
 .studio-panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: .8rem; font: 700 .9rem Arial, Helvetica, sans-serif; }
 .studio-close { border: 0; color: inherit; background: none; font-size: 1.4rem; cursor: pointer; }
+.scene-config-tools { margin: 0 0 .75rem; padding: .85rem; border: 1px solid rgba(220,185,135,.38); border-radius: .55rem; background: rgba(220,185,135,.055); font-family: Arial, Helvetica, sans-serif; }
+.scene-config-tools h2 { margin: 0; color: #f2dfbf; font: 600 .78rem Arial, Helvetica, sans-serif; letter-spacing: .04em; }
+.scene-config-tools p { margin: .35rem 0 .7rem; color: #aca89f; font-size: .68rem; line-height: 1.45; }
+.scene-config-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
+.scene-config-actions button { min-height: 2.25rem; padding: .45rem .5rem; border: 1px solid rgba(255,255,255,.2); border-radius: .35rem; color: #f0e9de; background: rgba(255,255,255,.06); font: 600 .68rem Arial, Helvetica, sans-serif; cursor: pointer; }
+.scene-config-actions button:nth-of-type(n + 3) { grid-column: 1 / -1; }
+.scene-config-actions button:hover, .scene-config-actions button:focus-visible { background: rgba(255,255,255,.15); }
+.scene-config-status { min-height: 1em; margin: .6rem 0 0 !important; color: #d7bb8f !important; }
 .studio-panel .particle-settings-toggle { position: static; display: block; width: 100%; margin-bottom: .6rem; text-align: left; }
 .studio-panel .bottle-editor, .studio-panel .sphere-editor, .studio-panel .ripple-editor { position: static; width: 100%; max-height: none; margin: .6rem 0 0; overflow: visible; box-shadow: none; }
 .studio-panel .bottle-editor summary, .studio-panel .sphere-editor summary, .studio-panel .ripple-editor summary { font-size: .84rem; }

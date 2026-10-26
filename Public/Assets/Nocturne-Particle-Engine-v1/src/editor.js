@@ -277,5 +277,5 @@ export function createCompositionEditor(settings, onChange) {
   });
 
   redrawControls();
-  return panel;
+  return { panel, refresh: redrawControls };
 }

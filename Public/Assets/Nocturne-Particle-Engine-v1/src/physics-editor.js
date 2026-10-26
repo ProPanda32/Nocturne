@@ -124,6 +124,7 @@ export function createPhysicsEditor(settings, onChange) {
   let lastMeter = 0;
   return {
     panel,
+    refresh,
     updateMeter(speed, force, fraction, now) {
       if (now - lastMeter < 80) return;
       lastMeter = now;

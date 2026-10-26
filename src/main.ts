@@ -3,6 +3,11 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { createBottleRendering } from './bottle-rendering'
 import { createSphereComposition, sphereDefaults, type SphereSettings } from './sphere-composition'
 import { rippleDefaults, type RippleSettings } from './ripple-settings'
+import {
+  ACTIVE_SCENE_KEY, DEFAULT_SCENE_KEY, SAVED_SCENE_KEY, SCENE_CONFIG_FORMAT,
+  migrateSceneConfig, parseSceneConfig, stampSceneConfig, storeSceneConfig,
+  type JsonObject, type ParticleSceneConfig, type SceneConfig,
+} from './scene-config'
 import './style.css'
 
 type Settings = {
@@ -33,7 +38,42 @@ const defaults: Settings = {
   keyLightIntensity: 1.8,
 }
 
-const settings: Settings = { ...defaults }
+const builtInConfig: SceneConfig = {
+  format: SCENE_CONFIG_FORMAT,
+  version: 1,
+  updatedAt: new Date(0).toISOString(),
+  bottle: { ...defaults },
+  spheres: { ...sphereDefaults },
+  ripples: { ...rippleDefaults },
+  particles: { composition: {}, physics: {}, appearance: {} },
+}
+const productionConfigUrl = new URL('../Public/Assets/Config/scene-config.default.json', import.meta.url).href
+let productionConfig = builtInConfig
+try {
+  const response = await fetch(productionConfigUrl)
+  if (response.ok) productionConfig = migrateSceneConfig(await response.json() as unknown, builtInConfig)
+} catch { /* Built-in values remain available if the production data file cannot load. */ }
+const storedConfig = parseSceneConfig(localStorage.getItem(ACTIVE_SCENE_KEY))
+  ?? parseSceneConfig(localStorage.getItem(DEFAULT_SCENE_KEY))
+let sceneConfig = migrateSceneConfig(storedConfig ?? productionConfig, productionConfig)
+const legacyCamera = parseSceneConfig(localStorage.getItem('particleCameraView'))
+if (legacyCamera && typeof legacyCamera === 'object') {
+  const camera = legacyCamera as { fov?: unknown; distance?: unknown }
+  const storedParticles = storedConfig && typeof storedConfig === 'object'
+    ? (storedConfig as { particles?: { composition?: { depth?: { fov?: unknown; distance?: unknown } } } }).particles : undefined
+  const storedDepth = storedParticles?.composition?.depth
+  const depth = sceneConfig.particles.composition.depth
+  if (depth && typeof depth === 'object') {
+    if (storedDepth?.fov === undefined && typeof camera.fov === 'number' && Number.isFinite(camera.fov)) {
+      ;(depth as JsonObject).fov = camera.fov
+    }
+    if (storedDepth?.distance === undefined && typeof camera.distance === 'number' && Number.isFinite(camera.distance)) {
+      ;(depth as JsonObject).distance = camera.distance
+    }
+    ;(depth as JsonObject).cameraSaved = true
+  }
+}
+const settings: Settings = { ...defaults, ...sceneConfig.bottle } as Settings
 const controls: { key: keyof Settings; label: string; min: number; max: number; step: number; unit?: string }[] = [
   { key: 'positionX', label: 'Position X', min: -3, max: 3, step: 0.01 },
   { key: 'positionY', label: 'Position Y', min: -3, max: 3, step: 0.01 },
@@ -112,6 +152,18 @@ app.innerHTML = `
   </dialog>
   <aside class="studio-panel" id="studio-panel" aria-label="Scene controls" hidden>
     <div class="studio-panel-head"><span>Scene controls</span><button class="studio-close" type="button" aria-label="Close scene controls">×</button></div>
+    <section class="scene-config-tools" aria-labelledby="scene-config-title">
+      <div><h2 id="scene-config-title">Scene Config</h2><p>Art direction is saved locally across refreshes and deployments.</p></div>
+      <div class="scene-config-actions">
+        <button type="button" data-scene-action="save">Save Scene</button>
+        <button type="button" data-scene-action="load">Load Scene</button>
+        <button type="button" data-scene-action="default">Set as Default</button>
+        <button type="button" data-scene-action="export">Copy / Export Config</button>
+        <button type="button" data-scene-action="import">Import Config</button>
+        <input type="file" data-scene-import accept="application/json,.json" hidden />
+      </div>
+      <p class="scene-config-status" role="status" aria-live="polite">Current scene auto-saved.</p>
+    </section>
     <button class="particle-settings-toggle" type="button" aria-controls="particle-layer" aria-expanded="false">Particle Settings</button>
     <details class="ripple-editor">
       <summary>Floor Ripple Settings <span>Temporary controls</span></summary>
@@ -184,6 +236,8 @@ window.setTimeout(() => app.querySelector('.entry-intro')?.remove(), 1850)
 
 const particleFrame = app.querySelector<HTMLIFrameElement>('.particle-layer')!
 const particleToggle = app.querySelector<HTMLButtonElement>('.particle-settings-toggle')!
+const particleRequests = new Map<string, (config: ParticleSceneConfig) => void>()
+let particleReady = false
 let particleControlsOpen = false
 const syncParticleControls = () => {
   particleToggle.setAttribute('aria-expanded', String(particleControlsOpen))
@@ -198,8 +252,21 @@ particleToggle.addEventListener('click', () => {
 })
 particleFrame.addEventListener('load', syncParticleControls)
 window.addEventListener('message', (event) => {
-  if (event.origin === location.origin && event.source === particleFrame.contentWindow
-      && event.data?.type === 'nocturne:particle-controls-ready') syncParticleControls()
+  if (event.origin !== location.origin || event.source !== particleFrame.contentWindow) return
+  if (event.data?.type === 'nocturne:particle-controls-ready') {
+    particleReady = true
+    syncParticleControls()
+    particleFrame.contentWindow?.postMessage({ type: 'nocturne:scene-config-apply', config: sceneConfig.particles }, location.origin)
+  } else if (event.data?.type === 'nocturne:particle-config-change') {
+    sceneConfig.particles = event.data.config as ParticleSceneConfig
+    scheduleAutoSaveScene()
+  } else if (event.data?.type === 'nocturne:particle-config-response') {
+    const resolve = particleRequests.get(String(event.data.requestId))
+    if (resolve) {
+      particleRequests.delete(String(event.data.requestId))
+      resolve(event.data.config as ParticleSceneConfig)
+    }
+  }
 })
 
 const sceneLayer = app.querySelector<HTMLDivElement>('.scene-layer')!
@@ -210,6 +277,8 @@ const rippleControlList = app.querySelector<HTMLDivElement>('.ripple-control-lis
 const editorMessage = app.querySelector<HTMLParagraphElement>('.editor-message')!
 const sphereEditorMessage = app.querySelector<HTMLParagraphElement>('.sphere-editor-message')!
 const rippleEditorMessage = app.querySelector<HTMLParagraphElement>('.ripple-editor-message')!
+const sceneConfigStatus = app.querySelector<HTMLParagraphElement>('.scene-config-status')!
+const sceneImport = app.querySelector<HTMLInputElement>('[data-scene-import]')!
 const hero = app.querySelector<HTMLElement>('.site-hero')!
 const cavernUrl = new URL('../Public/Assets/Images/nocturne-cavern.png', import.meta.url).href
 app.querySelector<HTMLImageElement>('.hero-cavern')!.src = cavernUrl
@@ -229,7 +298,7 @@ controlList.innerHTML = controls.map(({ key, label, min, max, step, unit }) => `
   </label>
 `).join('')
 
-const rippleSettings: RippleSettings = { ...rippleDefaults }
+const rippleSettings: RippleSettings = { ...rippleDefaults, ...sceneConfig.ripples } as RippleSettings
 const rippleControls: { key: keyof RippleSettings; label: string; min: number; max: number; step: number }[] = [
   { key: 'opacity', label: 'Ripple overlay opacity', min: 0, max: 1, step: 0.01 },
   { key: 'verticalPosition', label: 'Vertical position', min: -0.35, max: 0.35, step: 0.01 },
@@ -257,7 +326,7 @@ function applyRippleSettings() {
 }
 applyRippleSettings()
 
-const sphereSettings: SphereSettings = { ...sphereDefaults }
+const sphereSettings: SphereSettings = { ...sphereDefaults, ...sceneConfig.spheres } as SphereSettings
 const sphereControls: { key: keyof SphereSettings; label: string; min: number; max: number; step: number }[] = [
   { key: 'count', label: 'Overall count', min: 30, max: 60, step: 1 },
   { key: 'spread', label: 'Spread', min: 0.65, max: 1.7, step: 0.01 },
@@ -271,6 +340,78 @@ sphereControlList.innerHTML = sphereControls.map(({ key, label, min, max, step }
     <input type="range" data-sphere-setting="${key}" min="${min}" max="${max}" step="${step}" value="${sphereSettings[key]}" aria-label="${label}" />
   </label>
 `).join('')
+
+let autoSaveTimer: number | undefined
+
+function currentSceneConfig(): SceneConfig {
+  return stampSceneConfig({
+    ...sceneConfig,
+    bottle: { ...settings } as unknown as JsonObject,
+    spheres: { ...sphereSettings } as unknown as JsonObject,
+    ripples: { ...rippleSettings } as unknown as JsonObject,
+  })
+}
+
+function scheduleAutoSaveScene() {
+  window.clearTimeout(autoSaveTimer)
+  autoSaveTimer = window.setTimeout(() => {
+    sceneConfig = currentSceneConfig()
+    storeSceneConfig(ACTIVE_SCENE_KEY, sceneConfig)
+    sceneConfigStatus.textContent = 'Current scene auto-saved.'
+  }, 120)
+}
+
+function requestParticleConfig(): Promise<ParticleSceneConfig> {
+  if (!particleReady || !particleFrame.contentWindow) return Promise.resolve(sceneConfig.particles)
+  const requestId = crypto.randomUUID()
+  return new Promise((resolve) => {
+    const timeout = window.setTimeout(() => {
+      particleRequests.delete(requestId)
+      resolve(sceneConfig.particles)
+    }, 1500)
+    particleRequests.set(requestId, (config) => {
+      window.clearTimeout(timeout)
+      resolve(config)
+    })
+    particleFrame.contentWindow?.postMessage({ type: 'nocturne:particle-config-request', requestId }, location.origin)
+  })
+}
+
+async function captureSceneConfig() {
+  const particles = await requestParticleConfig()
+  sceneConfig.particles = particles
+  sceneConfig = currentSceneConfig()
+  return sceneConfig
+}
+
+function applySceneConfig(raw: unknown, message: string) {
+  sceneConfig = migrateSceneConfig(raw, productionConfig)
+  Object.assign(settings, sceneConfig.bottle)
+  Object.assign(sphereSettings, sceneConfig.spheres)
+  Object.assign(rippleSettings, sceneConfig.ripples)
+  applySettings()
+  applySphereSettings()
+  applyRippleSettings()
+  if (particleReady) {
+    particleFrame.contentWindow?.postMessage({ type: 'nocturne:scene-config-apply', config: sceneConfig.particles }, location.origin)
+  }
+  storeSceneConfig(ACTIVE_SCENE_KEY, sceneConfig)
+  sceneConfigStatus.textContent = message
+}
+
+function downloadSceneConfig(config: SceneConfig, filename: string) {
+  const blob = new Blob([`${JSON.stringify(config, null, 2)}\n`], { type: 'application/json' })
+  const href = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = href
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(href)
+}
+
+function isSceneConfigFile(raw: unknown) {
+  return Boolean(raw && typeof raw === 'object' && (raw as { format?: unknown }).format === SCENE_CONFIG_FORMAT)
+}
 
 const scene = new THREE.Scene()
 const camera = new THREE.PerspectiveCamera(defaults.cameraFov, 1, 0.1, 100)
@@ -364,6 +505,7 @@ controlList.addEventListener('input', (event) => {
   if (!key) return
   settings[key] = Number(input.value)
   applySettings()
+  scheduleAutoSaveScene()
 })
 
 sphereControlList.addEventListener('input', (event) => {
@@ -372,6 +514,7 @@ sphereControlList.addEventListener('input', (event) => {
   if (!key) return
   sphereSettings[key] = Number(input.value)
   applySphereSettings()
+  scheduleAutoSaveScene()
 })
 
 rippleControlList.addEventListener('input', (event) => {
@@ -380,24 +523,28 @@ rippleControlList.addEventListener('input', (event) => {
   if (!key) return
   rippleSettings[key] = Number(input.value)
   applyRippleSettings()
+  scheduleAutoSaveScene()
 })
 
 app.querySelector<HTMLButtonElement>('[data-ripple-action="reset"]')!.addEventListener('click', () => {
   Object.assign(rippleSettings, rippleDefaults)
   applyRippleSettings()
   rippleEditorMessage.textContent = 'Floor ripples reset.'
+  scheduleAutoSaveScene()
 })
 
 app.querySelector<HTMLButtonElement>('[data-sphere-action="reset"]')!.addEventListener('click', () => {
   Object.assign(sphereSettings, sphereDefaults)
   applySphereSettings()
   sphereEditorMessage.textContent = 'Sphere settings reset.'
+  scheduleAutoSaveScene()
 })
 
 app.querySelector<HTMLButtonElement>('[data-action="reset"]')!.addEventListener('click', () => {
   Object.assign(settings, defaults)
   applySettings()
   editorMessage.textContent = 'Settings reset.'
+  scheduleAutoSaveScene()
 })
 
 app.querySelector<HTMLButtonElement>('[data-action="copy"]')!.addEventListener('click', async () => {
@@ -407,6 +554,57 @@ app.querySelector<HTMLButtonElement>('[data-action="copy"]')!.addEventListener('
     editorMessage.textContent = 'Settings copied to clipboard.'
   } catch {
     editorMessage.textContent = 'Clipboard unavailable. Settings: ' + snapshot
+  }
+})
+
+app.querySelector<HTMLButtonElement>('[data-scene-action="save"]')!.addEventListener('click', async () => {
+  const config = await captureSceneConfig()
+  storeSceneConfig(ACTIVE_SCENE_KEY, config)
+  storeSceneConfig(SAVED_SCENE_KEY, config)
+  sceneConfigStatus.textContent = 'Scene saved in this browser.'
+})
+
+app.querySelector<HTMLButtonElement>('[data-scene-action="load"]')!.addEventListener('click', () => {
+  const saved = parseSceneConfig(localStorage.getItem(SAVED_SCENE_KEY))
+  if (!saved) {
+    sceneConfigStatus.textContent = 'No manually saved scene is available yet.'
+    return
+  }
+  applySceneConfig(saved, 'Saved scene loaded.')
+})
+
+app.querySelector<HTMLButtonElement>('[data-scene-action="default"]')!.addEventListener('click', async () => {
+  const config = await captureSceneConfig()
+  storeSceneConfig(ACTIVE_SCENE_KEY, config)
+  storeSceneConfig(DEFAULT_SCENE_KEY, config)
+  downloadSceneConfig(config, 'nocturne-scene-config.default.json')
+  sceneConfigStatus.textContent = 'Default saved locally and exported for production.'
+})
+
+app.querySelector<HTMLButtonElement>('[data-scene-action="export"]')!.addEventListener('click', async () => {
+  const config = await captureSceneConfig()
+  const json = JSON.stringify(config, null, 2)
+  try {
+    await navigator.clipboard.writeText(json)
+    sceneConfigStatus.textContent = 'Scene config copied and exported.'
+  } catch {
+    sceneConfigStatus.textContent = 'Scene config exported. Clipboard access was unavailable.'
+  }
+  downloadSceneConfig(config, 'nocturne-scene-config.json')
+})
+
+app.querySelector<HTMLButtonElement>('[data-scene-action="import"]')!.addEventListener('click', () => sceneImport.click())
+sceneImport.addEventListener('change', async () => {
+  const file = sceneImport.files?.[0]
+  sceneImport.value = ''
+  if (!file) return
+  try {
+    const raw = JSON.parse(await file.text()) as unknown
+    if (!isSceneConfigFile(raw)) throw new Error('Unsupported scene config format')
+    applySceneConfig(raw, 'Imported scene applied and auto-saved.')
+    storeSceneConfig(SAVED_SCENE_KEY, sceneConfig)
+  } catch {
+    sceneConfigStatus.textContent = 'Import failed. Choose a Nocturne scene-config JSON file.'
   }
 })
 

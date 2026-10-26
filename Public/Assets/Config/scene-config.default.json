@@ -1,0 +1,258 @@
+{
+  "format": "nocturne-scene-config",
+  "version": 1,
+  "updatedAt": "2026-10-26T00:00:00.000Z",
+  "bottle": {
+    "positionX": 0,
+    "positionY": 0,
+    "positionZ": 0,
+    "scale": 1,
+    "rotationX": 0,
+    "rotationY": 0,
+    "rotationZ": 0,
+    "cameraFov": 35,
+    "cameraDistance": 5,
+    "environmentIntensity": 1,
+    "keyLightIntensity": 1.8
+  },
+  "spheres": {
+    "count": 42,
+    "spread": 1,
+    "scaleMin": 0.07,
+    "scaleMax": 0.3,
+    "depth": 5
+  },
+  "ripples": {
+    "opacity": 0.25,
+    "verticalPosition": 0,
+    "verticalScale": 1,
+    "blendIntensity": 0.8,
+    "fadeHeight": 0.42
+  },
+  "particles": {
+    "composition": {
+      "links": {
+        "upper": true,
+        "lower": true
+      },
+      "selectedWing": "upper-left",
+      "upper": {
+        "left": {
+          "angle": 0,
+          "horizontal": 0,
+          "vertical": 0,
+          "length": 1,
+          "width": 1,
+          "curvature": 0.2,
+          "density": 1,
+          "size": 1,
+          "sizeFalloff": 0.42,
+          "zDepth": 0,
+          "depthSpread": 1,
+          "randomness": 1
+        },
+        "right": {
+          "angle": 0,
+          "horizontal": 0,
+          "vertical": 0,
+          "length": 1,
+          "width": 1,
+          "curvature": 0.2,
+          "density": 1,
+          "size": 1,
+          "sizeFalloff": 0.42,
+          "zDepth": 0,
+          "depthSpread": 1,
+          "randomness": 1
+        }
+      },
+      "lower": {
+        "left": {
+          "angle": 0,
+          "horizontal": 0,
+          "vertical": 0,
+          "length": 1,
+          "width": 1,
+          "curvature": 0.2,
+          "density": 1,
+          "size": 1,
+          "sizeFalloff": 0.42,
+          "zDepth": 0,
+          "depthSpread": 1,
+          "randomness": 1
+        },
+        "right": {
+          "angle": 0,
+          "horizontal": 0,
+          "vertical": 0,
+          "length": 1,
+          "width": 1,
+          "curvature": 0.2,
+          "density": 1,
+          "size": 1,
+          "sizeFalloff": 0.42,
+          "zDepth": 0,
+          "depthSpread": 1,
+          "randomness": 1
+        }
+      },
+      "structure": {
+        "rootWidth": 1,
+        "scale": 1
+      },
+      "field": {
+        "density": 1,
+        "depth": 1,
+        "softness": 1,
+        "size": 1
+      },
+      "bead": {
+        "highlightStrength": 1.15,
+        "highlightSize": 1,
+        "shadingStrength": 1,
+        "edgeDarkness": 0.75,
+        "brightness": 1.25
+      },
+      "depth": {
+        "thickness": 1,
+        "center": 0,
+        "bias": 0,
+        "randomness": 0.5,
+        "clumping": 0,
+        "noiseScale": 1,
+        "horizontal": 0,
+        "verticalDepth": 0,
+        "centerEdge": 0,
+        "curvature": 0,
+        "upperZ": 0,
+        "lowerZ": 0,
+        "leftZ": 0,
+        "rightZ": 0,
+        "upperDepth": 1,
+        "lowerDepth": 1,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "fov": 60,
+        "distance": 24,
+        "mode": 0,
+        "inspect": false,
+        "cameraSaved": false
+      }
+    },
+    "physics": {
+      "radius": 3.2,
+      "depth": 40,
+      "baseForce": 0.3,
+      "maxForce": 1800,
+      "forceMultiplier": 1,
+      "displacementScale": 1,
+      "maxDisplacement": 0,
+      "falloff": 1.4,
+      "sensitivity": 1,
+      "mouseVelocityMultiplier": 1,
+      "velocityCurve": 2.4,
+      "smoothing": 0.045,
+      "particleVelocityMultiplier": 1,
+      "maxVelocity": 180,
+      "momentum": 0.9,
+      "drag": 0.45,
+      "returnStrength": 0.7,
+      "returnDamping": 0.65,
+      "returnDelay": 0.65,
+      "radialPush": 0.8,
+      "directionalPush": 1.15,
+      "turbulenceStrength": 0,
+      "turbulenceScale": 0.6,
+      "turbulenceSpeed": 0.7,
+      "frozen": false,
+      "showRadius": false
+    },
+    "appearance": {
+      "preset": "Champagne",
+      "palette": [
+        {
+          "color": "#d3af79",
+          "enabled": true,
+          "weight": 1
+        },
+        {
+          "color": "#ddbe8f",
+          "enabled": true,
+          "weight": 1
+        },
+        {
+          "color": "#e6cca1",
+          "enabled": true,
+          "weight": 1
+        },
+        {
+          "color": "#efd8b1",
+          "enabled": true,
+          "weight": 1
+        },
+        {
+          "color": "#f7e4c0",
+          "enabled": true,
+          "weight": 1
+        },
+        {
+          "color": "#ffefcd",
+          "enabled": true,
+          "weight": 1
+        }
+      ],
+      "paletteBlend": 1,
+      "paletteRandomness": 1,
+      "saturation": 1,
+      "brightness": 1,
+      "exposure": 0,
+      "contrast": 1,
+      "colorIntensity": 1,
+      "temperature": 0,
+      "hueVariation": 0,
+      "saturationVariation": 0,
+      "brightnessVariation": 0,
+      "variationScale": 0,
+      "verticalInfluence": 0,
+      "horizontalInfluence": 0,
+      "depthInfluence": 0,
+      "lightX": -0.58,
+      "lightY": 0.72,
+      "lightZ": 0.69,
+      "keyIntensity": 1,
+      "ambient": 0.28,
+      "shadowDarkness": 1,
+      "roughness": 0.35,
+      "specularStrength": 1,
+      "metallic": 0,
+      "fresnel": 0,
+      "highlightStrength": 1,
+      "highlightSize": 1,
+      "highlightSharpness": 1,
+      "highlightX": 0,
+      "highlightY": 0,
+      "highlightZ": 0,
+      "glowIntensity": 0,
+      "glowRadius": 1.5,
+      "glowSoftness": 0.65,
+      "glowColorInfluence": 0.8,
+      "glowThreshold": 0.55,
+      "glowResponse": 1,
+      "bloomStrength": 0,
+      "bloomThreshold": 0.9,
+      "bloomRadius": 0.3,
+      "depthBrightness": 0,
+      "depthSaturation": 0,
+      "depthGlow": 0,
+      "depthContrast": 0,
+      "rimStrength": 0,
+      "rimX": 0.8,
+      "rimY": 0.4,
+      "rimZ": -0.25,
+      "rimWidth": 0.3,
+      "highlightColor": "#fffaec",
+      "rimColor": "#fff0d3"
+    }
+  }
+}
