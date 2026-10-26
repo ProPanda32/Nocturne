@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import type { RippleSettings } from './ripple-settings'
 
 const CORE = 1
 const LIQUID = 2
@@ -61,6 +62,8 @@ export function createBottleRendering(
   scene: THREE.Scene,
   camera: THREE.PerspectiveCamera,
   video: HTMLVideoElement,
+  cavernUrl: string,
+  rippleSettings: RippleSettings,
 ) {
   const environment = studioEnvironment(renderer)
   scene.environment = environment.texture
@@ -93,13 +96,68 @@ export function createBottleRendering(
   })
   const videoTexture = new THREE.VideoTexture(video)
   videoTexture.colorSpace = THREE.SRGBColorSpace
-  const videoMaterial = new THREE.MeshBasicMaterial({
-    map: videoTexture, depthTest: false, depthWrite: false, toneMapped: false,
+  const cavernReady = { value: 0 }
+  const cavernTexture = new THREE.TextureLoader().load(cavernUrl, () => { cavernReady.value = 1 })
+  cavernTexture.colorSpace = THREE.SRGBColorSpace
+  const backgroundUniforms = {
+    cavernMap: { value: cavernTexture },
+    oceanMap: { value: videoTexture },
+    cavernReady,
+    oceanReady: { value: 0 },
+    cavernRepeat: { value: new THREE.Vector2(1, 1) },
+    cavernOffset: { value: new THREE.Vector2() },
+    oceanRepeat: { value: new THREE.Vector2(1, 1) },
+    oceanOffset: { value: new THREE.Vector2() },
+    rippleOpacity: { value: rippleSettings.opacity },
+    ripplePosition: { value: rippleSettings.verticalPosition },
+    rippleScale: { value: rippleSettings.verticalScale },
+    rippleBlend: { value: rippleSettings.blendIntensity },
+    rippleFade: { value: rippleSettings.fadeHeight },
+  }
+  // Match the visible cavern/floor composite in the glass refraction capture.
+  const backgroundMaterial = new THREE.ShaderMaterial({
+    uniforms: backgroundUniforms,
+    depthTest: false,
+    depthWrite: false,
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = vec4(position.xy, 0.0, 1.0);
+      }`,
+    fragmentShader: `
+      uniform sampler2D cavernMap;
+      uniform sampler2D oceanMap;
+      uniform float cavernReady;
+      uniform float oceanReady;
+      uniform vec2 cavernRepeat;
+      uniform vec2 cavernOffset;
+      uniform vec2 oceanRepeat;
+      uniform vec2 oceanOffset;
+      uniform float rippleOpacity;
+      uniform float ripplePosition;
+      uniform float rippleScale;
+      uniform float rippleBlend;
+      uniform float rippleFade;
+      varying vec2 vUv;
+      void main() {
+        vec3 cavern = cavernReady > 0.5
+          ? texture2D(cavernMap, vUv * cavernRepeat + cavernOffset).rgb
+          : vec3(0.008, 0.007, 0.006);
+        float sourceY = (vUv.y - ripplePosition) / max(rippleScale, 0.01);
+        vec2 oceanUv = vec2(vUv.x, sourceY) * oceanRepeat + oceanOffset;
+        float withinVideo = step(0.0, sourceY) * step(sourceY, 1.0);
+        vec3 ocean = texture2D(oceanMap, oceanUv).rgb;
+        vec3 highlights = max(ocean - vec3(0.07), vec3(0.0)) * 1.25;
+        float floorMask = 1.0 - smoothstep(0.0, rippleFade, vUv.y);
+        vec3 reflection = highlights * rippleOpacity * rippleBlend * floorMask * withinVideo * oceanReady;
+        gl_FragColor = vec4(cavern + (vec3(1.0) - cavern) * reflection, 1.0);
+      }`,
   })
   const copyMaterial = new THREE.MeshBasicMaterial({
     map: backdrop.texture, depthTest: false, depthWrite: false, toneMapped: false,
   })
-  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), videoMaterial)
+  const quad: THREE.Mesh<THREE.PlaneGeometry, THREE.Material> = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), backgroundMaterial)
   quad.frustumCulled = false
   const screen = new THREE.Scene()
   screen.add(quad)
@@ -217,6 +275,10 @@ export function createBottleRendering(
   }
 
   const drawingSize = new THREE.Vector2()
+  function cover(repeat: THREE.Vector2, offset: THREE.Vector2, viewAspect: number, sourceAspect: number) {
+    repeat.set(Math.min(viewAspect / sourceAspect, 1), Math.min(sourceAspect / viewAspect, 1))
+    offset.set((1 - repeat.x) / 2, (1 - repeat.y) / 2)
+  }
   function resize() {
     renderer.getDrawingBufferSize(drawingSize)
     if (!drawingSize.equals(targetSize.value)) {
@@ -225,8 +287,11 @@ export function createBottleRendering(
     }
     const viewAspect = drawingSize.x / drawingSize.y
     const videoAspect = (video.videoWidth || 1920) / (video.videoHeight || 1080)
-    videoTexture.repeat.set(Math.min(viewAspect / videoAspect, 1), Math.min(videoAspect / viewAspect, 1))
-    videoTexture.offset.set((1 - videoTexture.repeat.x) / 2, (1 - videoTexture.repeat.y) / 2)
+    const cavernImage = cavernTexture.image as HTMLImageElement | undefined
+    const cavernAspect = cavernImage?.naturalWidth && cavernImage?.naturalHeight
+      ? cavernImage.naturalWidth / cavernImage.naturalHeight : 1821 / 864
+    cover(backgroundUniforms.cavernRepeat.value, backgroundUniforms.cavernOffset.value, viewAspect, cavernAspect)
+    cover(backgroundUniforms.oceanRepeat.value, backgroundUniforms.oceanOffset.value, viewAspect, videoAspect)
   }
 
   const clearColor = new THREE.Color()
@@ -236,6 +301,12 @@ export function createBottleRendering(
       return
     }
     resize()
+    backgroundUniforms.oceanReady.value = video.readyState >= 2 ? 1 : 0
+    backgroundUniforms.rippleOpacity.value = rippleSettings.opacity
+    backgroundUniforms.ripplePosition.value = rippleSettings.verticalPosition
+    backgroundUniforms.rippleScale.value = rippleSettings.verticalScale
+    backgroundUniforms.rippleBlend.value = rippleSettings.blendIntensity
+    backgroundUniforms.rippleFade.value = rippleSettings.fadeHeight
     const oldMask = camera.layers.mask
     const oldAutoClear = renderer.autoClear
     const oldTarget = renderer.getRenderTarget()
@@ -259,8 +330,8 @@ export function createBottleRendering(
       renderer.setRenderTarget(backdrop)
       renderer.setClearColor(0x080a0d, 1)
       renderer.clear()
-      quad.material = videoMaterial
-      if (video.readyState >= 2) renderer.render(screen, screenCamera)
+      quad.material = backgroundMaterial
+      renderer.render(screen, screenCamera)
       camera.layers.mask = 1 | (1 << CORE) | (1 << CAP_REFLECTOR) | (1 << COMPOSITION_LAYER)
       renderer.render(scene, camera)
 

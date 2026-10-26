@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { createBottleRendering } from './bottle-rendering'
 import { createSphereComposition, sphereDefaults, type SphereSettings } from './sphere-composition'
+import { rippleDefaults, type RippleSettings } from './ripple-settings'
 import './style.css'
 
 type Settings = {
@@ -62,7 +63,8 @@ app.innerHTML = `
   </header>
   <main>
     <section class="site-hero" id="top" aria-label="Nocturne perfume bottle experience">
-      <video class="hero-video" autoplay muted loop playsinline preload="auto" aria-hidden="true"></video>
+      <img class="hero-cavern" alt="" aria-hidden="true" />
+      <div class="ripple-layer" aria-hidden="true"><video class="hero-video" autoplay muted loop playsinline preload="auto"></video></div>
       <iframe id="particle-layer" class="particle-layer" src="./particle.html" title="Nocturne particle field" aria-hidden="true" tabindex="-1"></iframe>
       <div class="scene-layer" aria-label="Interactive 3D Nocturne perfume bottle"></div>
       <p class="load-status" role="status">Loading bottle…</p>
@@ -111,6 +113,14 @@ app.innerHTML = `
   <aside class="studio-panel" id="studio-panel" aria-label="Scene controls" hidden>
     <div class="studio-panel-head"><span>Scene controls</span><button class="studio-close" type="button" aria-label="Close scene controls">×</button></div>
     <button class="particle-settings-toggle" type="button" aria-controls="particle-layer" aria-expanded="false">Particle Settings</button>
+    <details class="ripple-editor">
+      <summary>Floor Ripple Settings <span>Temporary controls</span></summary>
+      <div class="editor-body">
+        <div class="ripple-control-list"></div>
+        <div class="editor-actions"><button type="button" data-ripple-action="reset">Reset Ripples</button></div>
+        <p class="ripple-editor-message" role="status" aria-live="polite"></p>
+      </div>
+    </details>
     <details class="sphere-editor">
       <summary>Sphere Settings <span>Temporary controls</span></summary>
       <div class="editor-body">
@@ -196,8 +206,13 @@ const sceneLayer = app.querySelector<HTMLDivElement>('.scene-layer')!
 const loadStatus = app.querySelector<HTMLParagraphElement>('.load-status')!
 const controlList = app.querySelector<HTMLDivElement>('.control-list')!
 const sphereControlList = app.querySelector<HTMLDivElement>('.sphere-control-list')!
+const rippleControlList = app.querySelector<HTMLDivElement>('.ripple-control-list')!
 const editorMessage = app.querySelector<HTMLParagraphElement>('.editor-message')!
 const sphereEditorMessage = app.querySelector<HTMLParagraphElement>('.sphere-editor-message')!
+const rippleEditorMessage = app.querySelector<HTMLParagraphElement>('.ripple-editor-message')!
+const hero = app.querySelector<HTMLElement>('.site-hero')!
+const cavernUrl = new URL('../Public/Assets/Images/nocturne-cavern.png', import.meta.url).href
+app.querySelector<HTMLImageElement>('.hero-cavern')!.src = cavernUrl
 const video = app.querySelector<HTMLVideoElement>('.hero-video')!
 video.src = new URL('../Public/Assets/Video/Background Final Video.web.mp4', import.meta.url).href
 
@@ -213,6 +228,34 @@ controlList.innerHTML = controls.map(({ key, label, min, max, step, unit }) => `
     <span class="unit" aria-hidden="true">${unit ?? ''}</span>
   </label>
 `).join('')
+
+const rippleSettings: RippleSettings = { ...rippleDefaults }
+const rippleControls: { key: keyof RippleSettings; label: string; min: number; max: number; step: number }[] = [
+  { key: 'opacity', label: 'Ripple overlay opacity', min: 0, max: 1, step: 0.01 },
+  { key: 'verticalPosition', label: 'Vertical position', min: -0.35, max: 0.35, step: 0.01 },
+  { key: 'verticalScale', label: 'Vertical scale', min: 0.5, max: 1.8, step: 0.01 },
+  { key: 'blendIntensity', label: 'Blend intensity', min: 0, max: 2, step: 0.01 },
+  { key: 'fadeHeight', label: 'Fade / mask height', min: 0.15, max: 0.7, step: 0.01 },
+]
+rippleControlList.innerHTML = rippleControls.map(({ key, label, min, max, step }) => `
+  <label class="control">
+    <span class="control-heading"><span>${label}</span><output data-ripple-value="${key}"></output></span>
+    <input type="range" data-ripple-setting="${key}" min="${min}" max="${max}" step="${step}" value="${rippleSettings[key]}" aria-label="${label}" />
+  </label>
+`).join('')
+
+function applyRippleSettings() {
+  hero.style.setProperty('--ripple-opacity', String(rippleSettings.opacity))
+  hero.style.setProperty('--ripple-position', `${-rippleSettings.verticalPosition * 100}%`)
+  hero.style.setProperty('--ripple-scale', String(rippleSettings.verticalScale))
+  hero.style.setProperty('--ripple-blend', String(rippleSettings.blendIntensity))
+  hero.style.setProperty('--ripple-fade-height', `${rippleSettings.fadeHeight * 100}%`)
+  for (const { key } of rippleControls) {
+    rippleControlList.querySelector<HTMLInputElement>(`[data-ripple-setting="${key}"]`)!.value = String(rippleSettings[key])
+    rippleControlList.querySelector<HTMLOutputElement>(`[data-ripple-value="${key}"]`)!.value = rippleSettings[key].toFixed(2)
+  }
+}
+applyRippleSettings()
 
 const sphereSettings: SphereSettings = { ...sphereDefaults }
 const sphereControls: { key: keyof SphereSettings; label: string; min: number; max: number; step: number }[] = [
@@ -241,7 +284,7 @@ renderer.toneMappingExposure = 1
 renderer.setClearColor(0x000000, 0)
 sceneLayer.append(renderer.domElement)
 
-const bottleRendering = createBottleRendering(renderer, scene, camera, video)
+const bottleRendering = createBottleRendering(renderer, scene, camera, video, cavernUrl, rippleSettings)
 
 const keyLight = new THREE.DirectionalLight(0xffe9ce, defaults.keyLightIntensity)
 keyLight.position.set(-3, 5, 6)
@@ -331,6 +374,20 @@ sphereControlList.addEventListener('input', (event) => {
   applySphereSettings()
 })
 
+rippleControlList.addEventListener('input', (event) => {
+  const input = event.target as HTMLInputElement
+  const key = input.dataset.rippleSetting as keyof RippleSettings | undefined
+  if (!key) return
+  rippleSettings[key] = Number(input.value)
+  applyRippleSettings()
+})
+
+app.querySelector<HTMLButtonElement>('[data-ripple-action="reset"]')!.addEventListener('click', () => {
+  Object.assign(rippleSettings, rippleDefaults)
+  applyRippleSettings()
+  rippleEditorMessage.textContent = 'Floor ripples reset.'
+})
+
 app.querySelector<HTMLButtonElement>('[data-sphere-action="reset"]')!.addEventListener('click', () => {
   Object.assign(sphereSettings, sphereDefaults)
   applySphereSettings()
@@ -389,6 +446,7 @@ if (import.meta.env.DEV) {
   Object.assign(window, {
     __nocturneBottle: { audit: bottleRendering.audit, renderer, scene, camera },
     __nocturneSpheres: { audit: () => sphereComposition?.audit(), settings: sphereSettings },
+    __nocturneRipples: { settings: rippleSettings },
   })
 }
 renderer.setAnimationLoop(bottleRendering.render)
