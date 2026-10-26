@@ -82,114 +82,54 @@ function applyPhysicsSettings(state) {
   if (state.frozen) pointerInput.uniforms.active.value = 0;
 }
 
-function wingPosition(side, rootXValue, rootYValue, rootZValue, t, outerX, outerY, outerZ, spread, offset, interior, controls) {
-  const rootX = structureUniforms.rootWidth.mul(rootXValue);
-  const rootY = float(rootYValue);
-  const x = mix(rootX, outerX.mul(controls.width), t).add(offset.x.mul(spread.x));
-  const y = mix(rootY, outerY, t).add(offset.y.mul(spread.y))
-    .add(interior.mul(float(0.8).add(controls.fullness.mul(0.2))));
-  const relativeX = x.sub(rootX);
-  const relativeY = y.sub(rootY).mul(controls.height)
-    .add(t.mul(Math.PI).sin().mul(controls.curvature).mul(3.6));
+function wingPosition(side, verticalDirection, t, volume, controls) {
+  const rootX = structureUniforms.rootWidth.mul(0.52).add(controls.horizontal);
+  const rootY = float(verticalDirection).mul(1.45).add(controls.vertical);
+  const envelope = smoothstep(0.015, 0.30, t)
+    .mul(mix(float(1), float(0.58), smoothstep(0.68, 1, t)));
+  const softness = controls.randomness.mul(fieldUniforms.softness);
+  // The centerline creates the X silhouette. Its widening elliptical cross
+  // section and independent Z scatter keep every wing volumetric.
+  const relativeX = t.mul(23).mul(controls.length)
+    .add(volume.x.mul(1.7).mul(softness).mul(envelope));
+  const relativeY = t.mul(10.8).mul(verticalDirection).mul(controls.length)
+    .add(t.mul(Math.PI).sin().mul(controls.curvature).mul(4.6).mul(verticalDirection))
+    .add(volume.y.mul(6.2).mul(controls.width).mul(envelope)
+      .mul(float(0.65).add(softness.mul(0.35))));
   const angle = controls.angle.mul(Math.PI / 180);
   const turnedX = relativeX.mul(angle.cos()).sub(relativeY.mul(angle.sin()));
   const turnedY = relativeX.mul(angle.sin()).add(relativeY.mul(angle.cos()));
-  const verticalShift = controls.vertical.mul(smoothstep(0.02, 0.42, t));
   return vec3(
     rootX.add(turnedX).mul(side),
-    rootY.add(turnedY).add(verticalShift),
-    mix(float(rootZValue), outerZ, t).add(offset.z.mul(spread.z)),
+    rootY.add(turnedY),
+    float(-14).add(controls.zDepth).sub(t.mul(10))
+      .add(volume.z.mul(30).mul(controls.depthSpread).mul(envelope)
+        .mul(float(0.55).add(softness.mul(0.45)))),
   );
 }
 
 const initialize = Fn(() => {
   const seed = instanceIndex;
   const family = hash(seed.mul(11).add(1));
-  const cluster = hash(seed.mul(11).add(2));
   const sx = hash(seed.mul(11).add(3)).sub(0.5);
-  const sy = hash(seed.mul(11).add(4)).sub(0.5);
   const sz = hash(seed.mul(11).add(5)).sub(0.5);
   const travel = hash(seed.mul(11).add(8));
   const wingInterior = hash(seed.mul(11).add(9)).mul(2).sub(1);
 
-  // Quadratic offsets create dense cores, porous edges, and isolated outliers.
-  // The deeper axis is deliberately broader so every mass has physical depth.
-  const compactOffset = vec3(
-    sx.mul(sx.abs()).mul(14),
-    sy.mul(sy.abs()).mul(11),
-    sz.mul(sz.abs()).mul(28),
-  ).mul(fieldUniforms.softness);
-  const airyOffset = vec3(
-    sx.mul(sx.abs()).mul(20),
-    sy.mul(sy.abs()).mul(16),
-    sz.mul(sz.abs()).mul(36),
-  ).mul(fieldUniforms.softness);
+  const t = travel.pow(0.82);
+  const volume = vec3(sx.mul(sx.abs()).mul(4), wingInterior, sz.mul(sz.abs()).mul(4));
+  const lowerLeft = wingPosition(-1, -1, t, volume, wingUniforms.lower.left);
+  const lowerRight = wingPosition(1, -1, t, volume, wingUniforms.lower.right);
+  const upperLeft = wingPosition(-1, 1, t, volume, wingUniforms.upper.left);
+  const upperRight = wingPosition(1, 1, t, volume, wingUniforms.upper.right);
 
-  // One canonical upper and lower construction defines both sides. Mirrored
-  // roots, destinations, and spread produce a clean bilateral macro silhouette.
-  const lowerT = travel.pow(0.78);
-  const upperT = travel.pow(0.82);
-  const lowerSpread = mix(vec3(0.16, 0.18, 0.26), vec3(1.30, 1.05, 1.22), lowerT);
-  const upperSpread = mix(vec3(0.14, 0.16, 0.24), vec3(1.18, 0.98, 1.16), upperT);
-  // Uniform interior sampling fills the broad wing fields. The envelope opens
-  // gradually from each shared attachment and softens at the outer tips.
-  const lowerInteriorSpan = smoothstep(0.02, 0.43, lowerT)
-    .mul(mix(float(5.9), float(5.0), smoothstep(0.68, 1.0, lowerT)));
-  const upperInteriorSpan = smoothstep(0.02, 0.43, upperT)
-    .mul(mix(float(6.8), float(5.8), smoothstep(0.68, 1.0, upperT)));
-  const lowerInterior = wingInterior.mul(lowerInteriorSpan);
-  const upperInterior = wingInterior.mul(upperInteriorSpan);
-
-  const lowerOuterX = select(
-    cluster.lessThan(0.31), float(9.5),
-    select(cluster.lessThan(0.68), float(16.2), float(23.3)),
-  );
-  const lowerOuterY = select(
-    cluster.lessThan(0.31), float(-4.2),
-    select(cluster.lessThan(0.68), float(-7.2), float(-10.2)),
-  );
-  const lowerOuterZ = select(
-    cluster.lessThan(0.31), float(-8.0),
-    select(cluster.lessThan(0.68), float(-20.0), float(-35.0)),
-  );
-  const lowerLeft = wingPosition(-1, 0.48, -1.6, -12, lowerT, lowerOuterX, lowerOuterY, lowerOuterZ,
-    lowerSpread, compactOffset, lowerInterior, wingUniforms.lower.left);
-  const lowerRight = wingPosition(1, 0.48, -1.6, -12, lowerT, lowerOuterX, lowerOuterY, lowerOuterZ,
-    lowerSpread, compactOffset, lowerInterior, wingUniforms.lower.right);
-
-  const upperOuterX = select(
-    cluster.lessThan(0.31), float(9.4),
-    select(cluster.lessThan(0.68), float(16.0), float(23.1)),
-  );
-  const upperOuterY = select(
-    cluster.lessThan(0.31), float(5.4),
-    select(cluster.lessThan(0.68), float(9.0), float(12.2)),
-  );
-  const upperOuterZ = select(
-    cluster.lessThan(0.31), float(-9.0),
-    select(cluster.lessThan(0.68), float(-21.0), float(-35.0)),
-  );
-  const upperLeft = wingPosition(-1, 0.44, 1.45, -14, upperT, upperOuterX, upperOuterY, upperOuterZ,
-    upperSpread, airyOffset, upperInterior, wingUniforms.upper.left);
-  const upperRight = wingPosition(1, 0.44, 1.45, -14, upperT, upperOuterX, upperOuterY, upperOuterZ,
-    upperSpread, airyOffset, upperInterior, wingUniforms.upper.right);
-
-  // A controlled vertical body stays exactly on the centerline. Only fine
-  // particle-level jitter and depth variation disturb its clean alignment.
-  const coreT = travel.pow(1.35);
-  const coreBase = vec3(0, mix(float(-3.9), float(5.4), coreT).mul(structureUniforms.bodyHeight),
-    mix(float(-11), float(-24), coreT));
-  const coreTaper = mix(vec3(0.18, 0.28, 0.78), vec3(0.08, 0.16, 0.48), coreT)
-    .mul(vec3(structureUniforms.bodyWidth, structureUniforms.bodyHeight, 1));
-  const centralCore = coreBase.add(compactOffset.mul(coreTaper));
-
-  // Fullness also reallocates GPU particles among the wing families. At the
-  // defaults the four family proportions match the existing formation.
-  const lowerLeftWeight = wingUniforms.lower.left.fullness.mul(0.21);
-  const lowerRightWeight = wingUniforms.lower.right.fullness.mul(0.21);
-  const upperLeftWeight = wingUniforms.upper.left.fullness.mul(0.25);
-  const upperRightWeight = wingUniforms.upper.right.fullness.mul(0.25);
-  const totalWeight = lowerLeftWeight.add(lowerRightWeight).add(upperLeftWeight).add(upperRightWeight).add(0.08);
+  // Density reallocates the same GPU particle budget between four regions;
+  // changing a wing never reduces the total active particle count.
+  const lowerLeftWeight = wingUniforms.lower.left.density;
+  const lowerRightWeight = wingUniforms.lower.right.density;
+  const upperLeftWeight = wingUniforms.upper.left.density;
+  const upperRightWeight = wingUniforms.upper.right.density;
+  const totalWeight = lowerLeftWeight.add(lowerRightWeight).add(upperLeftWeight).add(upperRightWeight);
   const lowerLeftCut = lowerLeftWeight.div(totalWeight);
   const lowerRightCut = lowerLeftWeight.add(lowerRightWeight).div(totalWeight);
   const upperLeftCut = lowerLeftWeight.add(lowerRightWeight).add(upperLeftWeight).div(totalWeight);
@@ -198,7 +138,7 @@ const initialize = Fn(() => {
     family.lessThan(lowerLeftCut), lowerLeft,
     select(family.lessThan(lowerRightCut), lowerRight,
       select(family.lessThan(upperLeftCut), upperLeft,
-        select(family.lessThan(upperRightCut), upperRight, centralCore))),
+        upperRight)),
   );
   const origin = shapeDepth(rawOrigin, seed, family, {
     lowerLeft: lowerLeftCut, lowerRight: lowerRightCut,
@@ -221,7 +161,18 @@ const initialize = Fn(() => {
   // Smoothly shrink particles with screen-space height. The steep random bias
   // keeps small grains common and reserves large bead accents for low regions.
   const height = smoothstep(-9, 11, rawOrigin.y.mul(structureUniforms.scale));
-  const particleSize = mix(lowerSize, upperSize, height);
+  const baseSize = mix(lowerSize, upperSize, height);
+  const wingSize = select(
+    family.lessThan(lowerLeftCut), wingUniforms.lower.left.size,
+    select(family.lessThan(lowerRightCut), wingUniforms.lower.right.size,
+      select(family.lessThan(upperLeftCut), wingUniforms.upper.left.size, wingUniforms.upper.right.size)),
+  );
+  const wingFalloff = select(
+    family.lessThan(lowerLeftCut), wingUniforms.lower.left.sizeFalloff,
+    select(family.lessThan(lowerRightCut), wingUniforms.lower.right.sizeFalloff,
+      select(family.lessThan(upperLeftCut), wingUniforms.upper.left.sizeFalloff, wingUniforms.upper.right.sizeFalloff)),
+  );
+  const particleSize = baseSize.mul(wingSize).mul(mix(float(1), float(1).sub(wingFalloff), t));
   appearance.element(seed).assign(vec4(
     particleSize,
     variation.mul(0.45).add(0.55),

@@ -1,16 +1,20 @@
 const wingFields = [
-  { key: 'width', label: 'Width', min: 0.45, max: 1.8, step: 0.01, initial: 1 },
-  { key: 'height', label: 'Height', min: 0.4, max: 1.8, step: 0.01, initial: 1 },
-  { key: 'vertical', label: 'Vertical position', min: -5, max: 5, step: 0.05, initial: 0 },
-  { key: 'angle', label: 'Angle', min: -35, max: 35, step: 1, initial: 0 },
-  { key: 'curvature', label: 'Curvature', min: -1, max: 1, step: 0.01, initial: 0 },
-  { key: 'fullness', label: 'Fullness / density', min: 0.35, max: 1.8, step: 0.01, initial: 1 },
+  { key: 'angle', label: 'Angle', min: -55, max: 55, step: 1, initial: 0 },
+  { key: 'horizontal', label: 'Horizontal position', min: -6, max: 6, step: 0.05, initial: 0 },
+  { key: 'vertical', label: 'Vertical position', min: -6, max: 6, step: 0.05, initial: 0 },
+  { key: 'length', label: 'Length', min: 0.35, max: 1.8, step: 0.01, initial: 1 },
+  { key: 'width', label: 'Width', min: 0.25, max: 2, step: 0.01, initial: 1 },
+  { key: 'curvature', label: 'Curvature', min: -1.5, max: 1.5, step: 0.01, initial: 0.2 },
+  { key: 'density', label: 'Density', min: 0.2, max: 2.2, step: 0.01, initial: 1 },
+  { key: 'size', label: 'Particle size', min: 0.35, max: 2.2, step: 0.01, initial: 1 },
+  { key: 'sizeFalloff', label: 'Size falloff: inner → outer', min: 0, max: 0.95, step: 0.01, initial: 0.42 },
+  { key: 'zDepth', label: 'Z-depth position', min: -24, max: 24, step: 0.1, initial: 0 },
+  { key: 'depthSpread', label: 'Depth spread', min: 0.1, max: 2.5, step: 0.01, initial: 1 },
+  { key: 'randomness', label: 'Randomness / softness', min: 0, max: 2.2, step: 0.01, initial: 1 },
 ];
 
 const structureFields = [
   { key: 'rootWidth', label: 'Wing root width', min: 0.35, max: 2.4, step: 0.01, initial: 1 },
-  { key: 'bodyWidth', label: 'Central body width', min: 0.3, max: 2.5, step: 0.01, initial: 1 },
-  { key: 'bodyHeight', label: 'Central body height', min: 0.5, max: 1.8, step: 0.01, initial: 1 },
   { key: 'scale', label: 'Overall formation scale', min: 0.65, max: 1.5, step: 0.01, initial: 1 },
 ];
 
@@ -57,8 +61,8 @@ const defaultsFor = (fields) => Object.fromEntries(fields.map(({ key, initial })
 
 export function defaultSettings() {
   return {
-    symmetry: true,
-    selectedSide: 'left',
+    links: { upper: true, lower: true },
+    selectedWing: 'upper-left',
     upper: { left: defaultsFor(wingFields), right: defaultsFor(wingFields) },
     lower: { left: defaultsFor(wingFields), right: defaultsFor(wingFields) },
     structure: defaultsFor(structureFields),
@@ -71,7 +75,7 @@ export function defaultSettings() {
 function formatValue(key, value, group = '') {
   if (key === 'angle' || key.startsWith('rotation') || key === 'fov') return `${Math.round(value)}°`;
   if (group === 'depth') return value.toFixed(key === 'noiseScale' || key === 'thickness' ? 2 : 1);
-  if (key === 'vertical' || key === 'curvature') return value.toFixed(2);
+  if (key === 'horizontal' || key === 'vertical' || key === 'curvature' || key === 'zDepth') return value.toFixed(2);
   if (key === 'density') return `${Math.round(value * 100)}%`;
   return `${value.toFixed(2)}×`;
 }
@@ -92,15 +96,21 @@ export function createCompositionEditor(settings, onChange) {
       <span class="editor-chevron" aria-hidden="true"></span>
     </summary>
     <div class="editor-content">
-      <div class="editor-mode">
-        <label class="mirror-label"><input type="checkbox" class="mirror-toggle" checked><span>Mirror left to right</span></label>
-        <div class="side-picker" hidden aria-label="Wing side to edit">
-          <button type="button" data-side="left" aria-pressed="true">Left</button>
-          <button type="button" data-side="right" aria-pressed="false">Right</button>
+      <div class="wing-sculptor">
+        <p class="wing-sculptor-label">Select a wing to sculpt</p>
+        <div class="wing-map" aria-label="Particle wing to edit">
+          <button type="button" data-wing="upper-left" aria-pressed="true"><span>Upper</span> left</button>
+          <span class="wing-axis" aria-hidden="true">NOCTURNE</span>
+          <button type="button" data-wing="upper-right" aria-pressed="false"><span>Upper</span> right</button>
+          <button type="button" data-wing="lower-left" aria-pressed="false"><span>Lower</span> left</button>
+          <button type="button" data-wing="lower-right" aria-pressed="false"><span>Lower</span> right</button>
+        </div>
+        <div class="wing-links">
+          <label class="mirror-label"><input type="checkbox" data-link="upper" checked><span>Link upper left / right</span></label>
+          <label class="mirror-label"><input type="checkbox" data-link="lower" checked><span>Link lower left / right</span></label>
         </div>
       </div>
-      <section class="editor-section"><h2>Upper wings</h2><p>Rise and spread from the upper root.</p>${wingFields.map((field) => controlMarkup('upper', field)).join('')}</section>
-      <section class="editor-section"><h2>Lower wings</h2><p>Fill the lower corners from the shared root.</p>${wingFields.map((field) => controlMarkup('lower', field)).join('')}</section>
+      <section class="editor-section wing-controls"><h2 class="current-wing-title">Upper-left wing</h2><p>Shape this curved three-dimensional particle volume.</p>${wingFields.map((field) => controlMarkup('wing', field)).join('')}</section>
       <section class="editor-section"><h2>Structure</h2>${structureFields.map((field) => controlMarkup('structure', field)).join('')}</section>
       <section class="editor-section"><h2>Particle field</h2>${fieldFields.map((field) => controlMarkup('field', field)).join('')}</section>
       <section class="editor-section depth-section">
@@ -140,14 +150,14 @@ export function createCompositionEditor(settings, onChange) {
   document.body.appendChild(panel);
   if (window.matchMedia('(max-width: 600px)').matches) panel.querySelector('details').open = false;
 
-  const mirror = panel.querySelector('.mirror-toggle');
-  const sidePicker = panel.querySelector('.side-picker');
+  const wingMap = panel.querySelector('.wing-map');
+  const linkToggles = panel.querySelectorAll('[data-link]');
   const result = panel.querySelector('.settings-result');
   const settingsText = panel.querySelector('textarea');
   const message = panel.querySelector('.editor-message');
 
   const snapshot = () => JSON.stringify({
-    symmetry: settings.symmetry,
+    links: settings.links,
     upper: settings.upper,
     lower: settings.lower,
     structure: settings.structure,
@@ -156,16 +166,22 @@ export function createCompositionEditor(settings, onChange) {
     depth: settings.depth,
   }, null, 2);
 
+  const selected = () => {
+    const [group, side] = settings.selectedWing.split('-');
+    return { group, side, values: settings[group][side] };
+  };
+
   const redrawControls = () => {
-    mirror.checked = settings.symmetry;
-    sidePicker.hidden = settings.symmetry;
-    for (const button of sidePicker.querySelectorAll('button')) {
-      button.setAttribute('aria-pressed', String(button.dataset.side === settings.selectedSide));
+    for (const toggle of linkToggles) toggle.checked = settings.links[toggle.dataset.link];
+    for (const button of wingMap.querySelectorAll('button')) {
+      button.setAttribute('aria-pressed', String(button.dataset.wing === settings.selectedWing));
     }
+    const wing = selected();
+    panel.querySelector('.current-wing-title').textContent = `${wing.group[0].toUpperCase()}${wing.group.slice(1)}-${wing.side} wing`;
     for (const control of panel.querySelectorAll('.control')) {
       const { group, key } = control.dataset;
-      const value = group === 'upper' || group === 'lower'
-        ? settings[group][settings.selectedSide][key]
+      const value = group === 'wing'
+        ? wing.values[key]
         : settings[group][key];
       const input = control.querySelector('input');
       input.value = String(value);
@@ -184,9 +200,10 @@ export function createCompositionEditor(settings, onChange) {
     if (!control) return;
     const { group, key } = control.dataset;
     const value = Number(event.target.value);
-    if (group === 'upper' || group === 'lower') {
-      settings[group][settings.selectedSide][key] = value;
-      if (settings.symmetry) settings[group].right[key] = settings[group].left[key] = value;
+    if (group === 'wing') {
+      const wing = selected();
+      wing.values[key] = value;
+      if (settings.links[wing.group]) settings[wing.group][wing.side === 'left' ? 'right' : 'left'][key] = value;
     } else {
       settings[group][key] = value;
       if (group === 'depth' && (key === 'fov' || key === 'distance')) settings.depth.cameraSaved = false;
@@ -220,20 +237,22 @@ export function createCompositionEditor(settings, onChange) {
     message.textContent = 'Original site camera restored.';
   });
 
-  mirror.addEventListener('change', () => {
-    settings.symmetry = mirror.checked;
-    if (settings.symmetry) {
-      settings.selectedSide = 'left';
-      for (const group of ['upper', 'lower']) settings[group].right = { ...settings[group].left };
+  for (const toggle of linkToggles) toggle.addEventListener('change', () => {
+    const group = toggle.dataset.link;
+    settings.links[group] = toggle.checked;
+    if (toggle.checked) {
+      const wing = selected();
+      const source = wing.group === group ? wing.side : 'left';
+      settings[group][source === 'left' ? 'right' : 'left'] = { ...settings[group][source] };
     }
     redrawControls();
-    onChange(settings, { group: 'symmetry' });
+    onChange(settings, { group: 'links', key: group });
   });
 
-  sidePicker.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-side]');
+  wingMap.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-wing]');
     if (!button) return;
-    settings.selectedSide = button.dataset.side;
+    settings.selectedWing = button.dataset.wing;
     redrawControls();
   });
 
