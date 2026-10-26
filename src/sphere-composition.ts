@@ -74,10 +74,13 @@ export function createSphereComposition(
     child.traverse((object) => { if (object instanceof THREE.Mesh) containsMesh = true })
     return containsMesh
   })
-  if (sourceGroups.length !== 5) throw new Error(`Expected 5 sphere designs, found ${sourceGroups.length}`)
+  const selectedSources = sourceGroups.filter((source) =>
+    source.name.includes('Marble_Gold_Rough') || source.name.includes('White_Gold_Marble'),
+  )
+  if (selectedSources.length !== 2) throw new Error(`Expected white and gold sphere designs, found ${selectedSources.length}`)
 
-  const maxPerDesign = 12
-  const designs: Design[] = sourceGroups.map((source) => {
+  const maxPerDesign = 30
+  const designs: Design[] = selectedSources.map((source) => {
     const clone = source.clone(true)
     clone.position.set(0, 0, 0)
     clone.updateMatrixWorld(true)
@@ -111,7 +114,7 @@ export function createSphereComposition(
   const instanceScale = new THREE.Vector3()
 
   function update(settings: SphereSettings) {
-    const perDesign = new Array(5).fill(0)
+    const perDesign = new Array(designs.length).fill(0)
     const aspect = camera.aspect || 1
     const verticalFov = THREE.MathUtils.degToRad(camera.fov)
     const ordered = anchors.slice(0, Math.round(settings.count))

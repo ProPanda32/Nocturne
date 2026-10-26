@@ -66,6 +66,22 @@ if (!media.video || media.video.readyState < 2 || !media.canvas || media.canvas.
   throw new Error('Video or canvas did not load: ' + JSON.stringify(media) + '; browser errors: ' + errors.join('; '))
 }
 
+await page.waitForFunction(() => window.__nocturneSpheres?.audit()?.instances === 42, null, { timeout: 15000 })
+const sphereAudit = await page.evaluate(() => window.__nocturneSpheres.audit())
+if (sphereAudit.designs !== 2 || sphereAudit.instances !== 42) {
+  throw new Error('Expected 42 white and gold sphere instances: ' + JSON.stringify(sphereAudit))
+}
+const dragBounds = await page.locator('.bottle-drag-target').boundingBox()
+if (!dragBounds || dragBounds.width < 40 || dragBounds.height < 40) throw new Error('Bottle drag target is missing')
+const dragX = dragBounds.x + dragBounds.width / 2
+const dragY = dragBounds.y + dragBounds.height / 2
+await page.mouse.move(dragX, dragY)
+await page.mouse.down()
+await page.mouse.move(dragX + 80, dragY)
+await page.mouse.up()
+const draggedRotation = Number(await page.locator('[data-setting="rotationY"]').inputValue())
+if (Math.abs(draggedRotation) < 20) throw new Error(`Bottle drag did not rotate on Y: ${draggedRotation}`)
+
 // The long SwiftShader/WebGPU startup can leave Playwright's actionability
 // observer waiting even though the fixed header and its handler are mounted.
 // Trigger the same user-facing click without depending on that observer.

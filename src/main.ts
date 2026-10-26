@@ -107,6 +107,7 @@ app.innerHTML = `
       <div class="ripple-layer" aria-hidden="true"><video class="hero-video" autoplay muted loop playsinline preload="auto"></video></div>
       <iframe id="particle-layer" class="particle-layer" src="./particle.html" title="Nocturne particle field" aria-hidden="true" tabindex="-1"></iframe>
       <div class="scene-layer" aria-label="Interactive 3D Nocturne perfume bottle"></div>
+      <div class="bottle-drag-target" role="button" tabindex="0" aria-label="Drag horizontally or use arrow keys to rotate the perfume bottle" hidden></div>
       <p class="load-status" role="status">Loading bottle…</p>
       <div class="hero-copy">
         <p class="hero-kicker">EAU DE PARFUM</p>
@@ -437,9 +438,65 @@ scene.add(fillLight)
 
 const bottleRoot = new THREE.Group()
 scene.add(bottleRoot)
+const bottleDragTarget = app.querySelector<HTMLDivElement>('.bottle-drag-target')!
 let bottleSize: THREE.Vector3 | null = null
 let baseScale = 1
 let sphereComposition: ReturnType<typeof createSphereComposition> | null = null
+let idleYaw = 0
+let lastFrameTime = 0
+let resumeIdleAt = 0
+let draggingBottle = false
+let lastPointerX = 0
+
+function updateBottleDragTarget() {
+  if (!bottleSize) return
+  const width = sceneLayer.clientWidth
+  const height = sceneLayer.clientHeight
+  const distance = Math.max(camera.position.z - bottleRoot.position.z, 0.5)
+  const viewHeight = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * distance
+  const viewWidth = viewHeight * camera.aspect
+  const center = bottleRoot.position.clone().project(camera)
+  const bottleWidth = bottleSize.x * baseScale * settings.scale / viewWidth * width
+  const bottleHeight = bottleSize.y * baseScale * settings.scale / viewHeight * height
+  bottleDragTarget.style.left = `${(center.x + 1) * width / 2}px`
+  bottleDragTarget.style.top = `${(1 - center.y) * height / 2}px`
+  bottleDragTarget.style.width = `${Math.min(width, bottleWidth * 1.18)}px`
+  bottleDragTarget.style.height = `${Math.min(height, bottleHeight * 1.08)}px`
+  bottleDragTarget.hidden = false
+}
+
+function stopBottleDrag(event: PointerEvent) {
+  if (!draggingBottle) return
+  draggingBottle = false
+  if (bottleDragTarget.hasPointerCapture(event.pointerId)) bottleDragTarget.releasePointerCapture(event.pointerId)
+  resumeIdleAt = performance.now() + 3000
+}
+
+bottleDragTarget.addEventListener('pointerdown', (event) => {
+  if (event.button !== 0) return
+  draggingBottle = true
+  lastPointerX = event.clientX
+  bottleDragTarget.setPointerCapture(event.pointerId)
+  event.preventDefault()
+})
+bottleDragTarget.addEventListener('pointermove', (event) => {
+  if (!draggingBottle) return
+  const delta = event.clientX - lastPointerX
+  lastPointerX = event.clientX
+  settings.rotationY = THREE.MathUtils.euclideanModulo(settings.rotationY + delta * 0.4 + 180, 360) - 180
+  applySettings()
+  scheduleAutoSaveScene()
+})
+bottleDragTarget.addEventListener('pointerup', stopBottleDrag)
+bottleDragTarget.addEventListener('pointercancel', stopBottleDrag)
+bottleDragTarget.addEventListener('keydown', (event) => {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+  settings.rotationY = THREE.MathUtils.euclideanModulo(settings.rotationY + (event.key === 'ArrowRight' ? 10 : -10) + 180, 360) - 180
+  applySettings()
+  scheduleAutoSaveScene()
+  resumeIdleAt = performance.now() + 3000
+  event.preventDefault()
+})
 
 function frameBottle() {
   if (!bottleSize) return
@@ -458,7 +515,7 @@ function applySettings() {
   bottleRoot.scale.setScalar(baseScale * settings.scale)
   bottleRoot.rotation.set(
     THREE.MathUtils.degToRad(settings.rotationX),
-    THREE.MathUtils.degToRad(settings.rotationY),
+    THREE.MathUtils.degToRad(settings.rotationY) + idleYaw,
     THREE.MathUtils.degToRad(settings.rotationZ),
   )
   camera.fov = settings.cameraFov
@@ -473,6 +530,7 @@ function applySettings() {
     output.value = settings[key].toFixed(Number.isInteger(settings[key]) ? 0 : 2) + (unit ?? '')
   }
   sphereComposition?.update(sphereSettings)
+  updateBottleDragTarget()
 }
 
 function applySphereSettings() {
@@ -647,4 +705,11 @@ if (import.meta.env.DEV) {
     __nocturneRipples: { settings: rippleSettings },
   })
 }
-renderer.setAnimationLoop(bottleRendering.render)
+renderer.setAnimationLoop((time) => {
+  if (lastFrameTime && !draggingBottle && time >= resumeIdleAt && !document.hidden) {
+    idleYaw += Math.min((time - lastFrameTime) / 1000, 0.1) * THREE.MathUtils.degToRad(4)
+    bottleRoot.rotation.y = THREE.MathUtils.degToRad(settings.rotationY) + idleYaw
+  }
+  lastFrameTime = time
+  bottleRendering.render()
+})
