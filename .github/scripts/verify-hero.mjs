@@ -13,7 +13,7 @@ const context = await browser.newContext({
   viewport: { width: 1440, height: 900 },
   permissions: ['clipboard-read', 'clipboard-write'],
 })
-const page = await context.newPage()
+let page = await context.newPage()
 const errors = []
 page.on('pageerror', (error) => errors.push(error.message))
 page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()) })
@@ -52,16 +52,6 @@ await page.waitForFunction(() => {
 const particleState = await page.frameLocator('.particle-layer').locator('html').getAttribute('data-particles')
 console.log('Particle engine state:', particleState)
 if (particleState !== 'ready') throw new Error('Particle engine did not start: ' + errors.join('; '))
-await page.waitForTimeout(2000)
-if (await page.title() !== 'Nocturne') throw new Error('Nocturne branding is missing')
-await page.locator('.header-menu').click()
-if (await page.locator('#menu-title').textContent() !== 'Explore Nocturne') {
-  throw new Error('Nocturne menu did not open')
-}
-await page.locator('.menu-close').click()
-await page.locator('.header-studio').click()
-await page.locator('.bottle-editor summary').click()
-await mkdir('.github/preview', { recursive: true })
 const media = await page.evaluate(() => {
   const video = document.querySelector('video')
   const canvas = document.querySelector('canvas')
@@ -75,20 +65,7 @@ if (!media.video || media.video.readyState < 2 || !media.canvas || media.canvas.
   throw new Error('Video or canvas did not load: ' + JSON.stringify(media) + '; browser errors: ' + errors.join('; '))
 }
 
-const fov = page.locator('[data-setting="cameraFov"]')
-await fov.evaluate((element) => {
-  element.value = '50'
-  element.dispatchEvent(new Event('input', { bubbles: true }))
-})
-if ((await page.locator('[data-value="cameraFov"]').textContent())?.trim() !== '50°') {
-  throw new Error('Camera FOV control did not update')
-}
-await page.locator('[data-action="copy"]').click()
-const copied = await page.evaluate(() => navigator.clipboard.readText())
-if (!copied.includes('"cameraFov": 50')) throw new Error('Copy Settings failed')
-await page.locator('[data-action="reset"]').click()
-if (await fov.inputValue() !== '35') throw new Error('Reset failed')
-
+await page.locator('.header-studio').click()
 const particleToggle = page.locator('.particle-settings-toggle')
 await particleToggle.click()
 const particlePanel = page.frameLocator('.particle-layer')
@@ -109,6 +86,44 @@ await particleToggle.click()
 if (await particleToggle.getAttribute('aria-expanded') !== 'false') {
   throw new Error('Particle settings toggle did not close')
 }
+if (errors.length) throw new Error('Browser errors: ' + errors.join('; '))
+
+// SwiftShader can lose its WebGPU device during a long combined test. Once
+// particle startup and controls pass, use a fresh page for the site shell.
+page.removeAllListeners('console')
+await page.close()
+page = await context.newPage()
+await page.route('**/particle.html', (route) => route.fulfill({
+  contentType: 'text/html', body: '<html style="background:transparent"></html>',
+}))
+page.on('pageerror', (error) => errors.push(error.message))
+page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()) })
+page.on('response', (response) => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`) })
+await page.goto('http://127.0.0.1:5173/', { waitUntil: 'domcontentloaded' })
+await page.locator('.load-status').waitFor({ state: 'detached', timeout: 45000 })
+await page.locator('.entry-intro').waitFor({ state: 'detached', timeout: 5000 })
+if (await page.title() !== 'Nocturne') throw new Error('Nocturne branding is missing')
+await page.locator('.header-menu').click()
+if (await page.locator('#menu-title').textContent() !== 'Explore Nocturne') {
+  throw new Error('Nocturne menu did not open')
+}
+await page.locator('.menu-close').click()
+await page.locator('.header-studio').click()
+await page.locator('.bottle-editor summary').click()
+
+const fov = page.locator('[data-setting="cameraFov"]')
+await fov.evaluate((element) => {
+  element.value = '50'
+  element.dispatchEvent(new Event('input', { bubbles: true }))
+})
+if ((await page.locator('[data-value="cameraFov"]').textContent())?.trim() !== '50°') {
+  throw new Error('Camera FOV control did not update')
+}
+await page.locator('[data-action="copy"]').click()
+const copied = await page.evaluate(() => navigator.clipboard.readText())
+if (!copied.includes('"cameraFov": 50')) throw new Error('Copy Settings failed')
+await page.locator('[data-action="reset"]').click()
+if (await fov.inputValue() !== '35') throw new Error('Reset failed')
 await page.locator('.studio-close').click()
 
 if (errors.length) throw new Error('Browser errors: ' + errors.join('; '))
