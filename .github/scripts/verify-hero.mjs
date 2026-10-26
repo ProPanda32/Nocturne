@@ -15,6 +15,7 @@ const context = await browser.newContext({
 })
 let page = await context.newPage()
 const errors = []
+const domClick = (locator) => locator.evaluate((element) => element.click())
 page.on('pageerror', (error) => errors.push(error.message))
 page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()) })
 page.on('response', (response) => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`) })
@@ -68,15 +69,15 @@ if (!media.video || media.video.readyState < 2 || !media.canvas || media.canvas.
 // The long SwiftShader/WebGPU startup can leave Playwright's actionability
 // observer waiting even though the fixed header and its handler are mounted.
 // Trigger the same user-facing click without depending on that observer.
-await page.locator('.header-studio').evaluate((element) => element.click())
+await domClick(page.locator('.header-studio'))
 const particleToggle = page.locator('.particle-settings-toggle')
-await particleToggle.evaluate((element) => element.click())
+await domClick(particleToggle)
 const particlePanel = page.frameLocator('.particle-layer')
 await particlePanel.locator('.appearance-dock').waitFor({ state: 'visible' })
 if (await particlePanel.locator('.appearance-dock > .composition-editor').count() !== 3) {
   throw new Error('Particle composition, physics and appearance controls were not mounted')
 }
-await particlePanel.locator('.appearance-dock > .composition-editor').first().locator('summary').click()
+await domClick(particlePanel.locator('.appearance-dock > .composition-editor').first().locator('summary'))
 const density = particlePanel.locator('[data-group="field"][data-key="density"] input')
 await density.evaluate((element) => {
   element.value = '0.8'
@@ -85,7 +86,7 @@ await density.evaluate((element) => {
 if ((await particlePanel.locator('[data-group="field"][data-key="density"] output').textContent())?.trim() !== '80%') {
   throw new Error('Particle density control did not update')
 }
-await particleToggle.evaluate((element) => element.click())
+await domClick(particleToggle)
 if (await particleToggle.getAttribute('aria-expanded') !== 'false') {
   throw new Error('Particle settings toggle did not close')
 }
@@ -96,6 +97,7 @@ if (actionableErrors.length) throw new Error('Browser errors: ' + actionableErro
 // particle startup and controls pass, use a fresh page for the site shell.
 page.removeAllListeners('console')
 await page.close()
+errors.length = 0
 page = await context.newPage()
 await page.route('**/particle.html', (route) => route.fulfill({
   contentType: 'text/html', body: '<html style="background:transparent"></html>',
@@ -107,13 +109,13 @@ await page.goto('http://127.0.0.1:5173/', { waitUntil: 'domcontentloaded' })
 await page.locator('.load-status').waitFor({ state: 'detached', timeout: 45000 })
 await page.locator('.entry-intro').waitFor({ state: 'detached', timeout: 5000 })
 if (await page.title() !== 'Nocturne') throw new Error('Nocturne branding is missing')
-await page.locator('.header-menu').click()
+await domClick(page.locator('.header-menu'))
 if (await page.locator('#menu-title').textContent() !== 'Explore Nocturne') {
   throw new Error('Nocturne menu did not open')
 }
-await page.locator('.menu-close').click()
-await page.locator('.header-studio').click()
-await page.locator('.bottle-editor summary').click()
+await domClick(page.locator('.menu-close'))
+await domClick(page.locator('.header-studio'))
+await domClick(page.locator('.bottle-editor summary'))
 
 const fov = page.locator('[data-setting="cameraFov"]')
 await fov.evaluate((element) => {
@@ -123,12 +125,12 @@ await fov.evaluate((element) => {
 if ((await page.locator('[data-value="cameraFov"]').textContent())?.trim() !== '50°') {
   throw new Error('Camera FOV control did not update')
 }
-await page.locator('[data-action="copy"]').click()
+await domClick(page.locator('[data-action="copy"]'))
 const copied = await page.evaluate(() => navigator.clipboard.readText())
 if (!copied.includes('"cameraFov": 50')) throw new Error('Copy Settings failed')
-await page.locator('[data-action="reset"]').click()
+await domClick(page.locator('[data-action="reset"]'))
 if (await fov.inputValue() !== '35') throw new Error('Reset failed')
-await page.locator('.studio-close').click()
+await domClick(page.locator('.studio-close'))
 
 if (errors.length) throw new Error('Browser errors: ' + errors.join('; '))
 await mkdir('.github/preview', { recursive: true })
