@@ -22,7 +22,7 @@ renderer.setClearColor(0x000000, 0);
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.querySelector('#app').appendChild(renderer.domElement);
 
-const DEFAULT_PARTICLE_COUNT = 70_000;
+const DEFAULT_PARTICLE_COUNT = 95_000;
 const PARTICLE_CAPACITY = 100_000;
 const portraitWidth = uniform(1);
 const mobileBudget = () => window.innerWidth < 700 ? 0.68 : window.innerWidth < 1100 ? 0.85 : 1;
@@ -84,18 +84,18 @@ function applyPhysicsSettings(state) {
 }
 
 function wingPosition(side, verticalDirection, t, volume, controls) {
-  const rootX = structureUniforms.rootWidth.mul(0.52).add(controls.horizontal);
-  const rootY = float(verticalDirection).mul(1.45).add(controls.vertical);
+  const rootX = structureUniforms.rootWidth.mul(verticalDirection > 0 ? 4.8 : 4.1).add(controls.horizontal);
+  const rootY = float(verticalDirection > 0 ? -0.7 : -2.0).add(controls.vertical);
   const envelope = smoothstep(0.015, 0.30, t)
     .mul(mix(float(1), float(0.58), smoothstep(0.68, 1, t)));
   const softness = controls.randomness.mul(fieldUniforms.softness);
   // The centerline creates the X silhouette. Its widening elliptical cross
   // section and independent Z scatter keep every wing volumetric.
-  const relativeX = t.mul(23).mul(controls.length)
-    .add(volume.x.mul(1.7).mul(softness).mul(envelope));
-  const relativeY = t.mul(10.8).mul(verticalDirection).mul(controls.length)
-    .add(t.mul(Math.PI).sin().mul(controls.curvature).mul(4.6).mul(verticalDirection))
-    .add(volume.y.mul(6.2).mul(controls.width).mul(envelope)
+  const relativeX = t.mul(19).mul(controls.length)
+    .add(volume.x.mul(1.25).mul(softness).mul(envelope));
+  const relativeY = t.mul(verticalDirection > 0 ? 9.5 : -1.6).mul(controls.length)
+    .add(t.mul(Math.PI).sin().mul(controls.curvature).mul(verticalDirection > 0 ? 3.2 : 1.1))
+    .add(volume.y.mul(verticalDirection > 0 ? 4.5 : 4.1).mul(controls.width).mul(envelope)
       .mul(float(0.65).add(softness.mul(0.35))));
   const angle = controls.angle.mul(Math.PI / 180);
   const turnedX = relativeX.mul(angle.cos()).sub(relativeY.mul(angle.sin()));
@@ -103,8 +103,8 @@ function wingPosition(side, verticalDirection, t, volume, controls) {
   return vec3(
     rootX.add(turnedX).mul(side).mul(portraitWidth),
     rootY.add(turnedY),
-    float(-14).add(controls.zDepth).sub(t.mul(10))
-      .add(volume.z.mul(30).mul(controls.depthSpread).mul(envelope)
+    float(-18).add(controls.zDepth).sub(t.mul(4))
+      .add(volume.z.mul(10).mul(controls.depthSpread).mul(envelope)
         .mul(float(0.55).add(softness.mul(0.45)))),
   );
 }
@@ -156,11 +156,11 @@ const initialize = Fn(() => {
   });
   origins.element(seed).assign(origin);
   const variation = hash(seed.mul(11).add(6));
-  const lowerSize = variation.pow(2.7).mul(0.050).add(0.043);
-  const upperSize = variation.pow(3.5).mul(0.028).add(0.020);
+  const lowerSize = variation.pow(7).mul(0.045).add(0.026);
+  const upperSize = variation.pow(8).mul(0.022).add(0.015);
   // Smoothly shrink particles with screen-space height. The steep random bias
   // keeps small grains common and reserves large bead accents for low regions.
-  const height = smoothstep(-9, 11, rawOrigin.y.mul(structureUniforms.scale));
+  const height = smoothstep(-6, 8, rawOrigin.y.mul(structureUniforms.scale));
   const baseSize = mix(lowerSize, upperSize, height);
   const wingSize = select(
     family.lessThan(lowerLeftCut), wingUniforms.lower.left.size,
@@ -214,6 +214,8 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
   particles.count = Math.min(PARTICLE_CAPACITY, Math.round(DEFAULT_PARTICLE_COUNT * settings.field.density * mobileBudget()));
   applyCameraView();
+  compositionDirty = true;
+  preserveWorldPosition = false;
 });
 
 let compositionDirty = false;
@@ -221,7 +223,7 @@ let preserveWorldPosition = true;
 function applyCameraView() {
   const aspect = window.innerWidth / Math.max(window.innerHeight, 1);
   // Compress the wings in world space in portrait instead of cropping the desktop field.
-  portraitWidth.value = aspect < 0.8 ? THREE.MathUtils.lerp(0.37, 0.55, Math.min(aspect / 0.8, 1)) : 1;
+  portraitWidth.value = aspect < 0.8 ? THREE.MathUtils.lerp(0.34, 0.58, Math.min(aspect / 0.8, 1)) : 1;
   camera.fov = settings.depth.fov;
   camera.updateProjectionMatrix();
   const targetZ = -20;
@@ -341,11 +343,11 @@ function mountParticleControls() {
 try {
   await renderer.init();
   if (!renderer.backend.isWebGPUBackend) throw new Error('A native WebGPU backend is required.');
+  applyCameraView();
   await renderer.computeAsync(initialize);
   initialState.value = 0;
   const start = performance.now();
   let previousFrame = start;
-  applyCameraView();
   const compositionEditor = createCompositionEditor(settings, applyEditorSettings);
   const physicsEditor = createPhysicsEditor(physicsSettings, applyPhysicsSettings);
   const lookEditor = createLookEditor(look.settings, (state) => { look.apply(state); emitParticleConfig(); });

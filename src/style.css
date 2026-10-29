@@ -158,15 +158,20 @@ button, a { -webkit-tap-highlight-color: transparent; }
 
 /* The hero is composed against the available viewport, including phone safe areas. */
 .site-hero { height: 100svh; min-height: 0; }
-.site-header { min-height: clamp(4rem, 9vh, 5.75rem); padding: max(.75rem, env(safe-area-inset-top)) max(1rem, 3.2vw); }
-.hero-copy { bottom: max(1rem, env(safe-area-inset-bottom)); width: min(90vw, 34rem); }
-.hero-copy h1 { margin: .55rem 0 .8rem; font-size: clamp(2.5rem, 5.3vh, 4rem); line-height: .95; }
-.hero-kicker { font-size: clamp(.57rem, 1.1vh, .72rem); }
-.hero-discover { font-size: clamp(.7rem, 1.3vh, .83rem); }
+.site-header { min-height: clamp(3.7rem, 8vh, 5rem); padding: max(.5rem, env(safe-area-inset-top)) max(1rem, 3.2vw); }
+.header-logo { font-size: clamp(1.55rem, 2.1vw, 2rem); letter-spacing: .12em; }
+.header-menu, .header-studio { font-size: .72rem; }
+.header-menu { gap: .4rem; }
+.header-menu svg { width: 1.1rem; height: 1.1rem; }
+.hero-cavern { filter: brightness(.48) saturate(.78); }
+.hero-copy { bottom: max(.35rem, env(safe-area-inset-bottom)); width: min(90vw, 34rem); }
+.hero-copy h1 { margin: .32rem 0 .75rem; font-size: clamp(2.35rem, 6.3vh, 3.5rem); line-height: 1.03; }
+.hero-kicker { font-size: clamp(.55rem, 1vh, .66rem); }
+.hero-discover { font-size: clamp(.68rem, 1.3vh, .78rem); }
 @media (max-width: 1100px) {
   .site-header { min-height: 4.4rem; }
   .header-logo { font-size: clamp(1.3rem, 2.7vw, 2rem); }
-  .hero-copy h1 { font-size: clamp(2.35rem, 5.4vh, 3.4rem); }
+  .hero-copy h1 { font-size: clamp(2.25rem, 5.8vh, 3.4rem); }
 }
 @media (max-width: 700px) {
   .site-header { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: .35rem; padding: max(.8rem, env(safe-area-inset-top)) max(.8rem, env(safe-area-inset-right)); }
@@ -174,8 +179,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .header-menu, .header-studio { font-size: .68rem; }
   .header-menu { gap: .25rem; }
   .header-studio { text-align: right; }
-  .hero-copy { bottom: max(1.25rem, calc(env(safe-area-inset-bottom) + .8rem)); width: calc(100% - 2rem); }
-  .hero-copy h1 { font-size: clamp(2.4rem, 7.2vh, 3.5rem); margin: .4rem 0 .8rem; }
+  .hero-copy { bottom: max(.8rem, calc(env(safe-area-inset-bottom) + .5rem)); width: calc(100% - 2rem); }
+  .hero-copy h1 { font-size: clamp(2.25rem, 6.2vh, 3.3rem); margin: .35rem 0 .65rem; }
   .hero-kicker { font-size: .58rem; }
   .hero-discover { font-size: .75rem; }
   .hero-cavern, .hero-video { object-position: center center; }

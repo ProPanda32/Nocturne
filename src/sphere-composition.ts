@@ -10,10 +10,10 @@ export type SphereSettings = {
 }
 
 export const sphereDefaults: SphereSettings = {
-  count: 42,
+  count: 8,
   spread: 1,
-  scaleMin: 0.07,
-  scaleMax: 0.3,
+  scaleMin: 0.025,
+  scaleMax: 0.07,
   depth: 5,
 }
 

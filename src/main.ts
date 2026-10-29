@@ -56,6 +56,23 @@ try {
 const storedConfig = parseSceneConfig(localStorage.getItem(ACTIVE_SCENE_KEY))
   ?? parseSceneConfig(localStorage.getItem(DEFAULT_SCENE_KEY))
 let sceneConfig = migrateSceneConfig(storedConfig ?? productionConfig, productionConfig)
+// Carry untouched browser auto-saves forward to the corrected art direction.
+// Values deliberately edited in Scene controls retain their local choices.
+if (storedConfig) {
+  if (sceneConfig.spheres.count === 42 && sceneConfig.spheres.scaleMin === 0.07 && sceneConfig.spheres.scaleMax === 0.3) {
+    Object.assign(sceneConfig.spheres, { count: 8, scaleMin: 0.025, scaleMax: 0.07 })
+  }
+  const composition = sceneConfig.particles.composition as JsonObject
+  const wings = composition.upper as Record<string, JsonObject> | undefined
+  const lowerWings = composition.lower as Record<string, JsonObject> | undefined
+  for (const [group, density] of [[wings, 0.9], [lowerWings, 1.8]] as const) {
+    for (const side of ['left', 'right']) {
+      if (group?.[side]?.density === 1) group[side].density = density
+    }
+  }
+  const structure = composition.structure as JsonObject | undefined
+  if (structure?.rootWidth === 1) structure.rootWidth = 1.35
+}
 const legacyCamera = parseSceneConfig(localStorage.getItem('particleCameraView'))
 if (legacyCamera && typeof legacyCamera === 'object') {
   const camera = legacyCamera as { fov?: unknown; distance?: unknown }
@@ -329,10 +346,10 @@ applyRippleSettings()
 
 const sphereSettings: SphereSettings = { ...sphereDefaults, ...sceneConfig.spheres } as SphereSettings
 const sphereControls: { key: keyof SphereSettings; label: string; min: number; max: number; step: number }[] = [
-  { key: 'count', label: 'Overall count', min: 30, max: 60, step: 1 },
+  { key: 'count', label: 'Overall count', min: 0, max: 60, step: 1 },
   { key: 'spread', label: 'Spread', min: 0.65, max: 1.7, step: 0.01 },
-  { key: 'scaleMin', label: 'Minimum scale', min: 0.03, max: 0.5, step: 0.01 },
-  { key: 'scaleMax', label: 'Maximum scale', min: 0.2, max: 1.1, step: 0.01 },
+  { key: 'scaleMin', label: 'Minimum scale', min: 0.01, max: 0.5, step: 0.005 },
+  { key: 'scaleMax', label: 'Maximum scale', min: 0.02, max: 1.1, step: 0.005 },
   { key: 'depth', label: 'Depth', min: 1, max: 9, step: 0.1 },
 ]
 sphereControlList.innerHTML = sphereControls.map(({ key, label, min, max, step }) => `
@@ -504,8 +521,8 @@ function frameBottle() {
   const viewHeight = 2 * Math.tan(THREE.MathUtils.degToRad(settings.cameraFov / 2)) * settings.cameraDistance
   const viewWidth = viewHeight * aspect
   const portrait = aspect < 0.8
-  const targetHeight = portrait ? (sceneLayer.clientHeight < 720 ? 0.43 : 0.49) : aspect < 1.35 ? 0.59 : 0.63
-  const targetWidth = portrait ? 0.76 : aspect < 1.35 ? 0.52 : 0.42
+  const targetHeight = portrait ? (sceneLayer.clientHeight < 720 ? 0.40 : 0.47) : aspect < 1.35 ? 0.58 : 0.63
+  const targetWidth = portrait ? 0.70 : aspect < 1.35 ? 0.50 : 0.29
   baseScale = Math.min(
     (viewHeight * targetHeight) / Math.max(bottleSize.y, 0.001),
     (viewWidth * targetWidth) / Math.max(bottleSize.x, 0.001),
@@ -517,7 +534,7 @@ function applySettings() {
   const aspect = sceneLayer.clientWidth / Math.max(sceneLayer.clientHeight, 1)
   const viewHeight = 2 * Math.tan(THREE.MathUtils.degToRad(settings.cameraFov / 2)) * settings.cameraDistance
   // Move the bottle higher on portrait screens to reserve a clear text zone.
-  const compositionY = aspect < 0.8 ? 0.075 : 0.035
+  const compositionY = aspect < 0.8 ? 0.10 : 0.02
   bottleRoot.position.set(settings.positionX, settings.positionY + viewHeight * compositionY, settings.positionZ)
   bottleRoot.scale.setScalar(baseScale * settings.scale)
   bottleRoot.rotation.set(
