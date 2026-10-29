@@ -24,6 +24,8 @@ document.querySelector('#app').appendChild(renderer.domElement);
 
 const DEFAULT_PARTICLE_COUNT = 70_000;
 const PARTICLE_CAPACITY = 100_000;
+const portraitWidth = uniform(1);
+const mobileBudget = () => window.innerWidth < 700 ? 0.68 : window.innerWidth < 1100 ? 0.85 : 1;
 const settings = defaultSettings();
 try {
   const saved = JSON.parse(localStorage.getItem('particleCameraView') || 'null');
@@ -99,7 +101,7 @@ function wingPosition(side, verticalDirection, t, volume, controls) {
   const turnedX = relativeX.mul(angle.cos()).sub(relativeY.mul(angle.sin()));
   const turnedY = relativeX.mul(angle.sin()).add(relativeY.mul(angle.cos()));
   return vec3(
-    rootX.add(turnedX).mul(side),
+    rootX.add(turnedX).mul(side).mul(portraitWidth),
     rootY.add(turnedY),
     float(-14).add(controls.zDepth).sub(t.mul(10))
       .add(volume.z.mul(30).mul(controls.depthSpread).mul(envelope)
@@ -200,7 +202,7 @@ material.toneMapped = false;
 
 // One mesh and one instanced draw, without per-particle Object3Ds or matrices.
 const particles = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
-particles.count = DEFAULT_PARTICLE_COUNT;
+particles.count = Math.round(DEFAULT_PARTICLE_COUNT * mobileBudget());
 particles.frustumCulled = false; // Positions live in GPU storage, not CPU bounds.
 scene.add(particles);
 const look = createParticleLook({ renderer, scene, camera, particles, positions, origins, appearance, fieldUniforms, beadUniforms });
@@ -208,20 +210,24 @@ const look = createParticleLook({ renderer, scene, camera, particles, positions,
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, window.innerWidth < 700 ? 1.35 : 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
+  particles.count = Math.min(PARTICLE_CAPACITY, Math.round(DEFAULT_PARTICLE_COUNT * settings.field.density * mobileBudget()));
   applyCameraView();
 });
 
 let compositionDirty = false;
 let preserveWorldPosition = true;
 function applyCameraView() {
+  const aspect = window.innerWidth / Math.max(window.innerHeight, 1);
+  // Compress the wings in world space in portrait instead of cropping the desktop field.
+  portraitWidth.value = aspect < 0.8 ? THREE.MathUtils.lerp(0.37, 0.55, Math.min(aspect / 0.8, 1)) : 1;
   camera.fov = settings.depth.fov;
   camera.updateProjectionMatrix();
   const targetZ = -20;
   orbit.target.set(0, 0, targetZ);
   if (!settings.depth.inspect) {
-    camera.position.set(0, 0, targetZ + Math.max(settings.depth.distance, 29 / Math.max(camera.aspect, 0.45)));
+    camera.position.set(0, 0, targetZ + (aspect < 0.8 ? Math.max(settings.depth.distance, 30) : Math.max(settings.depth.distance, 29 / aspect)));
     camera.lookAt(orbit.target);
   } else {
     camera.position.sub(orbit.target).normalize().multiplyScalar(settings.depth.distance).add(orbit.target);
@@ -249,7 +255,7 @@ function applyEditorSettings(state, change = { group: 'reset' }) {
     pointerInput.setSuspended(state.depth.inspect);
     if (change.group === 'reset' || ['fov', 'distance', 'inspect', 'restoreCamera'].includes(change.key)) applyCameraView();
   }
-  particles.count = Math.min(PARTICLE_CAPACITY, Math.round(DEFAULT_PARTICLE_COUNT * state.field.density));
+  particles.count = Math.min(PARTICLE_CAPACITY, Math.round(DEFAULT_PARTICLE_COUNT * state.field.density * mobileBudget()));
   if (change.group !== 'bead' && !(change.group === 'field' && ['size', 'density'].includes(change.key))
       && !(change.group === 'depth' && ['fov', 'distance', 'inspect', 'saveCamera', 'restoreCamera'].includes(change.key))) {
     compositionDirty = true;
