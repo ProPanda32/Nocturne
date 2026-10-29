@@ -22,10 +22,10 @@ renderer.setClearColor(0x000000, 0);
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.querySelector('#app').appendChild(renderer.domElement);
 
-const DEFAULT_PARTICLE_COUNT = 95_000;
-const PARTICLE_CAPACITY = 100_000;
+const DEFAULT_PARTICLE_COUNT = 145_000;
+const PARTICLE_CAPACITY = 160_000;
 const portraitWidth = uniform(1);
-const mobileBudget = () => window.innerWidth < 700 ? 0.68 : window.innerWidth < 1100 ? 0.85 : 1;
+const mobileBudget = () => window.innerWidth < 700 ? 0.48 : window.innerWidth < 1100 ? 0.76 : 1;
 const settings = defaultSettings();
 try {
   const saved = JSON.parse(localStorage.getItem('particleCameraView') || 'null');
@@ -83,29 +83,34 @@ function applyPhysicsSettings(state) {
   emitParticleConfig();
 }
 
-function wingPosition(side, verticalDirection, t, volume, controls) {
-  const rootX = structureUniforms.rootWidth.mul(verticalDirection > 0 ? 4.8 : 4.1).add(controls.horizontal);
-  const rootY = float(verticalDirection > 0 ? -0.7 : -2.0).add(controls.vertical);
-  const envelope = smoothstep(0.015, 0.30, t)
-    .mul(mix(float(1), float(0.58), smoothstep(0.68, 1, t)));
+function wingPosition(side, verticalDirection, t, volume, pocket, controls) {
+  // Seven overlapping pockets on each side break the former mirrored wedge.
+  // Existing wing controls still move, size and sculpt each bank independently.
+  const rootX = structureUniforms.rootWidth.mul(verticalDirection > 0 ? 2.9 : 2.5).add(controls.horizontal);
+  const rootY = float(verticalDirection > 0 ? 0.6 : -2.1).add(controls.vertical);
   const softness = controls.randomness.mul(fieldUniforms.softness);
-  // The centerline creates the X silhouette. Its widening elliptical cross
-  // section and independent Z scatter keep every wing volumetric.
-  const relativeX = t.mul(19).mul(controls.length)
-    .add(volume.x.mul(1.25).mul(softness).mul(envelope));
-  const relativeY = t.mul(verticalDirection > 0 ? 9.5 : -1.6).mul(controls.length)
-    .add(t.mul(Math.PI).sin().mul(controls.curvature).mul(verticalDirection > 0 ? 3.2 : 1.1))
-    .add(volume.y.mul(verticalDirection > 0 ? 4.5 : 4.1).mul(controls.width).mul(envelope)
-      .mul(float(0.65).add(softness.mul(0.35))));
+  const bank = (side > 0 ? 2 : 0) + (verticalDirection > 0 ? 1 : 0);
+  const cluster = vec3(
+    hash(pocket.mul(17).add(bank * 31)).sub(0.5),
+    hash(pocket.mul(29).add(bank * 37)).mul(2).sub(1),
+    hash(pocket.mul(41).add(bank * 43)).mul(2).sub(1),
+  );
+  const relativeX = t.mul(13).mul(controls.length)
+    .add(cluster.x.mul(6.5))
+    .add(volume.x.mul(4.2).mul(softness));
+  const relativeY = t.mul(verticalDirection > 0 ? 6.8 : -0.7).mul(controls.length)
+    .add(cluster.y.mul(verticalDirection > 0 ? 4.0 : 3.1))
+    .add(t.mul(4.1).sin().mul(controls.curvature).mul(2.2))
+    .add(volume.y.mul(verticalDirection > 0 ? 4.5 : 3.5).mul(controls.width));
   const angle = controls.angle.mul(Math.PI / 180);
   const turnedX = relativeX.mul(angle.cos()).sub(relativeY.mul(angle.sin()));
   const turnedY = relativeX.mul(angle.sin()).add(relativeY.mul(angle.cos()));
   return vec3(
     rootX.add(turnedX).mul(side).mul(portraitWidth),
     rootY.add(turnedY),
-    float(-18).add(controls.zDepth).sub(t.mul(4))
-      .add(volume.z.mul(10).mul(controls.depthSpread).mul(envelope)
-        .mul(float(0.55).add(softness.mul(0.45)))),
+    float(-19).add(controls.zDepth).sub(t.mul(4))
+      .add(cluster.z.mul(5))
+      .add(volume.z.mul(9).mul(controls.depthSpread)),
   );
 }
 
@@ -116,12 +121,13 @@ const initialize = Fn(() => {
   const sz = hash(seed.mul(11).add(5)).sub(0.5);
   const travel = hash(seed.mul(11).add(8));
   const wingInterior = hash(seed.mul(11).add(9)).mul(2).sub(1);
-  const t = travel.pow(0.82);
+  const t = travel.pow(1.45);
+  const pocket = hash(seed.mul(23).add(13)).mul(7).floor();
   const volume = vec3(sx.mul(sx.abs()).mul(4), wingInterior, sz.mul(sz.abs()).mul(4));
-  const lowerLeft = wingPosition(-1, -1, t, volume, wingUniforms.lower.left);
-  const lowerRight = wingPosition(1, -1, t, volume, wingUniforms.lower.right);
-  const upperLeft = wingPosition(-1, 1, t, volume, wingUniforms.upper.left);
-  const upperRight = wingPosition(1, 1, t, volume, wingUniforms.upper.right);
+  const lowerLeft = wingPosition(-1, -1, t, volume, pocket, wingUniforms.lower.left);
+  const lowerRight = wingPosition(1, -1, t, volume, pocket, wingUniforms.lower.right);
+  const upperLeft = wingPosition(-1, 1, t, volume, pocket, wingUniforms.upper.left);
+  const upperRight = wingPosition(1, 1, t, volume, pocket, wingUniforms.upper.right);
 
   // Density reallocates the same GPU particle budget between four regions;
   // changing a wing never reduces the total active particle count.
@@ -156,8 +162,8 @@ const initialize = Fn(() => {
   });
   origins.element(seed).assign(origin);
   const variation = hash(seed.mul(11).add(6));
-  const lowerSize = variation.pow(7).mul(0.045).add(0.026);
-  const upperSize = variation.pow(8).mul(0.022).add(0.015);
+  const lowerSize = variation.pow(5).mul(0.065).add(0.022);
+  const upperSize = variation.pow(7).mul(0.032).add(0.014);
   // Smoothly shrink particles with screen-space height. The steep random bias
   // keeps small grains common and reserves large bead accents for low regions.
   const height = smoothstep(-6, 8, rawOrigin.y.mul(structureUniforms.scale));
