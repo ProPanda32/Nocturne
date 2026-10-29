@@ -111,7 +111,7 @@ app.innerHTML = `
       <p class="load-status" role="status">Loading bottle…</p>
       <div class="hero-copy">
         <p class="hero-kicker">EAU DE PARFUM</p>
-        <h1>Enter Nocturne</h1>
+        <h1>Enter<br>Nocturne</h1>
         <a href="#fragrance" class="hero-discover">Discover the fragrance <span aria-hidden="true">↗</span></a>
       </div>
     </section>
@@ -501,17 +501,24 @@ bottleDragTarget.addEventListener('keydown', (event) => {
 function frameBottle() {
   if (!bottleSize) return
   const aspect = sceneLayer.clientWidth / Math.max(sceneLayer.clientHeight, 1)
-  const viewHeight = 2 * Math.tan(THREE.MathUtils.degToRad(defaults.cameraFov / 2)) * defaults.cameraDistance
+  const viewHeight = 2 * Math.tan(THREE.MathUtils.degToRad(settings.cameraFov / 2)) * settings.cameraDistance
   const viewWidth = viewHeight * aspect
+  const portrait = aspect < 0.8
+  const targetHeight = portrait ? (sceneLayer.clientHeight < 720 ? 0.43 : 0.49) : aspect < 1.35 ? 0.59 : 0.63
+  const targetWidth = portrait ? 0.76 : aspect < 1.35 ? 0.52 : 0.42
   baseScale = Math.min(
-    (viewHeight * 0.74) / Math.max(bottleSize.y, 0.001),
-    (viewWidth * 0.72) / Math.max(bottleSize.x, 0.001),
+    (viewHeight * targetHeight) / Math.max(bottleSize.y, 0.001),
+    (viewWidth * targetWidth) / Math.max(bottleSize.x, 0.001),
   )
   applySettings()
 }
 
 function applySettings() {
-  bottleRoot.position.set(settings.positionX, settings.positionY, settings.positionZ)
+  const aspect = sceneLayer.clientWidth / Math.max(sceneLayer.clientHeight, 1)
+  const viewHeight = 2 * Math.tan(THREE.MathUtils.degToRad(settings.cameraFov / 2)) * settings.cameraDistance
+  // Move the bottle higher on portrait screens to reserve a clear text zone.
+  const compositionY = aspect < 0.8 ? 0.075 : 0.035
+  bottleRoot.position.set(settings.positionX, settings.positionY + viewHeight * compositionY, settings.positionZ)
   bottleRoot.scale.setScalar(baseScale * settings.scale)
   bottleRoot.rotation.set(
     THREE.MathUtils.degToRad(settings.rotationX),
@@ -549,6 +556,7 @@ function applySphereSettings() {
 function resize() {
   const width = Math.max(sceneLayer.clientWidth, 1)
   const height = Math.max(sceneLayer.clientHeight, 1)
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, width < 700 ? 1.5 : 2))
   renderer.setSize(width, height, false)
   camera.aspect = width / height
   camera.updateProjectionMatrix()
