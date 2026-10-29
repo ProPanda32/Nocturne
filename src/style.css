@@ -155,3 +155,38 @@ button, a { -webkit-tap-highlight-color: transparent; }
   html { scroll-behavior: auto; }
   .entry-intro, .entry-intro span, .menu-dialog[open] { animation-duration: .01ms; }
 }
+
+/* The hero is composed against the available viewport, including phone safe areas. */
+.site-hero { height: 100svh; min-height: 0; }
+.site-header { min-height: clamp(4rem, 9vh, 5.75rem); padding: max(.75rem, env(safe-area-inset-top)) max(1rem, 3.2vw); }
+.hero-copy { bottom: max(1rem, env(safe-area-inset-bottom)); width: min(90vw, 34rem); }
+.hero-copy h1 { margin: .55rem 0 .8rem; font-size: clamp(2.5rem, 5.3vh, 4rem); line-height: .95; }
+.hero-kicker { font-size: clamp(.57rem, 1.1vh, .72rem); }
+.hero-discover { font-size: clamp(.7rem, 1.3vh, .83rem); }
+@media (max-width: 1100px) {
+  .site-header { min-height: 4.4rem; }
+  .header-logo { font-size: clamp(1.3rem, 2.7vw, 2rem); }
+  .hero-copy h1 { font-size: clamp(2.35rem, 5.4vh, 3.4rem); }
+}
+@media (max-width: 700px) {
+  .site-header { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: .35rem; padding: max(.8rem, env(safe-area-inset-top)) max(.8rem, env(safe-area-inset-right)); }
+  .header-logo { font-size: clamp(1.15rem, 5vw, 1.5rem); letter-spacing: .075em; }
+  .header-menu, .header-studio { font-size: .68rem; }
+  .header-menu { gap: .25rem; }
+  .header-studio { text-align: right; }
+  .hero-copy { bottom: max(1.25rem, calc(env(safe-area-inset-bottom) + .8rem)); width: calc(100% - 2rem); }
+  .hero-copy h1 { font-size: clamp(2.4rem, 7.2vh, 3.5rem); margin: .4rem 0 .8rem; }
+  .hero-kicker { font-size: .58rem; }
+  .hero-discover { font-size: .75rem; }
+  .hero-cavern, .hero-video { object-position: center center; }
+}
+@media (max-width: 390px) {
+  .header-menu span { display: none; }
+  .header-studio { max-width: 4rem; line-height: 1.2; }
+  .hero-copy h1 { font-size: clamp(2.15rem, 6.6vh, 3rem); }
+}
+@media (max-height: 700px) and (max-width: 700px) {
+  .hero-copy h1 { font-size: clamp(2rem, 6.2vh, 2.8rem); }
+  .hero-copy { bottom: max(.65rem, env(safe-area-inset-bottom)); }
+  .hero-discover { padding: .25rem 0; }
+}
