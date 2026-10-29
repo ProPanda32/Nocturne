@@ -128,7 +128,7 @@ app.innerHTML = `
       <p class="load-status" role="status">Loading bottle…</p>
       <div class="hero-copy">
         <p class="hero-kicker">EAU DE PARFUM</p>
-        <h1>Enter<br>Nocturne</h1>
+        <h1>Enter Nocturne</h1>
         <a href="#fragrance" class="hero-discover">Discover the fragrance <span aria-hidden="true">↗</span></a>
       </div>
     </section>
@@ -521,7 +521,7 @@ function frameBottle() {
   const viewHeight = 2 * Math.tan(THREE.MathUtils.degToRad(settings.cameraFov / 2)) * settings.cameraDistance
   const viewWidth = viewHeight * aspect
   const portrait = aspect < 0.8
-  const targetHeight = portrait ? (sceneLayer.clientHeight < 720 ? 0.40 : 0.47) : aspect < 1.35 ? 0.58 : 0.63
+  const targetHeight = portrait ? (sceneLayer.clientHeight < 720 ? 0.36 : 0.42) : aspect < 1.35 ? 0.49 : 0.52
   const targetWidth = portrait ? 0.70 : aspect < 1.35 ? 0.50 : 0.29
   baseScale = Math.min(
     (viewHeight * targetHeight) / Math.max(bottleSize.y, 0.001),
@@ -534,7 +534,7 @@ function applySettings() {
   const aspect = sceneLayer.clientWidth / Math.max(sceneLayer.clientHeight, 1)
   const viewHeight = 2 * Math.tan(THREE.MathUtils.degToRad(settings.cameraFov / 2)) * settings.cameraDistance
   // Move the bottle higher on portrait screens to reserve a clear text zone.
-  const compositionY = aspect < 0.8 ? 0.10 : 0.02
+  const compositionY = aspect < 0.8 ? 0.11 : 0.055
   bottleRoot.position.set(settings.positionX, settings.positionY + viewHeight * compositionY, settings.positionZ)
   bottleRoot.scale.setScalar(baseScale * settings.scale)
   bottleRoot.rotation.set(
