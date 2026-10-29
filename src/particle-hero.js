@@ -214,6 +214,8 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
   particles.count = Math.min(PARTICLE_CAPACITY, Math.round(DEFAULT_PARTICLE_COUNT * settings.field.density * mobileBudget()));
   applyCameraView();
+  compositionDirty = true;
+  preserveWorldPosition = false;
 });
 
 let compositionDirty = false;
@@ -341,11 +343,11 @@ function mountParticleControls() {
 try {
   await renderer.init();
   if (!renderer.backend.isWebGPUBackend) throw new Error('A native WebGPU backend is required.');
+  applyCameraView();
   await renderer.computeAsync(initialize);
   initialState.value = 0;
   const start = performance.now();
   let previousFrame = start;
-  applyCameraView();
   const compositionEditor = createCompositionEditor(settings, applyEditorSettings);
   const physicsEditor = createPhysicsEditor(physicsSettings, applyPhysicsSettings);
   const lookEditor = createLookEditor(look.settings, (state) => { look.apply(state); emitParticleConfig(); });
