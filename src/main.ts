@@ -124,6 +124,7 @@ app.innerHTML = `
       <div class="ripple-layer" aria-hidden="true"><video class="hero-video" autoplay muted loop playsinline preload="auto"></video></div>
       <iframe id="particle-layer" class="particle-layer" src="./particle.html" title="Nocturne particle field" aria-hidden="true" tabindex="-1"></iframe>
       <div class="scene-layer" aria-label="Interactive 3D Nocturne perfume bottle"></div>
+      <div class="sphere-arrange-layer" aria-label="Drag sphere handles to arrange them" hidden></div>
       <div class="bottle-drag-target" role="button" tabindex="0" aria-label="Drag horizontally or use arrow keys to rotate the perfume bottle" hidden></div>
       <p class="load-status" role="status">Loading bottle…</p>
       <div class="hero-copy">
@@ -195,6 +196,14 @@ app.innerHTML = `
       <summary>Sphere Settings <span>Temporary controls</span></summary>
       <div class="editor-body">
         <div class="sphere-control-list"></div>
+        <div class="sphere-position-editor">
+          <button type="button" class="sphere-arrange-toggle" aria-pressed="false">Arrange spheres on canvas</button>
+          <label>Selected sphere <select class="sphere-selected"></select></label>
+          <label>Horizontal <input type="range" data-sphere-position="x" min="-1.15" max="1.15" step="0.01" /></label>
+          <label>Vertical <input type="range" data-sphere-position="y" min="-1.15" max="1.15" step="0.01" /></label>
+          <label>Depth <input type="range" data-sphere-position="depth" min="0" max="1" step="0.01" /></label>
+          <button type="button" class="sphere-reset-selected">Reset selected position</button>
+        </div>
         <div class="editor-actions"><button type="button" data-sphere-action="reset">Reset Spheres</button></div>
         <p class="sphere-editor-message" role="status" aria-live="polite"></p>
       </div>
@@ -278,6 +287,11 @@ window.addEventListener('message', (event) => {
   } else if (event.data?.type === 'nocturne:particle-config-change') {
     sceneConfig.particles = event.data.config as ParticleSceneConfig
     scheduleAutoSaveScene()
+  } else if (event.data?.type === 'nocturne:sphere-pointer') {
+    const { x, y } = event.data
+    const index = Number.isFinite(x) && Number.isFinite(y)
+      ? sphereComposition?.hitTest(x, y, sceneLayer.clientWidth, sceneLayer.clientHeight) ?? -1 : -1
+    sphereComposition?.setHovered(index)
   } else if (event.data?.type === 'nocturne:particle-config-response') {
     const resolve = particleRequests.get(String(event.data.requestId))
     if (resolve) {
@@ -344,13 +358,14 @@ function applyRippleSettings() {
 }
 applyRippleSettings()
 
-const sphereSettings: SphereSettings = { ...sphereDefaults, ...sceneConfig.spheres } as SphereSettings
-const sphereControls: { key: keyof SphereSettings; label: string; min: number; max: number; step: number }[] = [
+const sphereSettings: SphereSettings = { ...structuredClone(sphereDefaults), ...sceneConfig.spheres } as SphereSettings
+const sphereControls: { key: Exclude<keyof SphereSettings, 'positions'>; label: string; min: number; max: number; step: number }[] = [
   { key: 'count', label: 'Overall count', min: 0, max: 60, step: 1 },
   { key: 'spread', label: 'Spread', min: 0.65, max: 1.7, step: 0.01 },
   { key: 'scaleMin', label: 'Minimum scale', min: 0.01, max: 0.5, step: 0.005 },
   { key: 'scaleMax', label: 'Maximum scale', min: 0.02, max: 1.1, step: 0.005 },
   { key: 'depth', label: 'Depth', min: 1, max: 9, step: 0.1 },
+  { key: 'hoverSpeed', label: 'Hover rotation speed (degrees/second)', min: 0, max: 360, step: 5 },
 ]
 sphereControlList.innerHTML = sphereControls.map(({ key, label, min, max, step }) => `
   <label class="control">
@@ -459,6 +474,89 @@ const bottleDragTarget = app.querySelector<HTMLDivElement>('.bottle-drag-target'
 let bottleSize: THREE.Vector3 | null = null
 let baseScale = 1
 let sphereComposition: ReturnType<typeof createSphereComposition> | null = null
+const arrangeLayer = app.querySelector<HTMLDivElement>('.sphere-arrange-layer')!
+const sphereSelected = app.querySelector<HTMLSelectElement>('.sphere-selected')!
+const positionInputs = Array.from(app.querySelectorAll<HTMLInputElement>('[data-sphere-position]'))
+let selectedSphere = 0
+let draggingSphere = -1
+let previousSphereFrame = 0
+function updateSphereHandles() {
+  if (arrangeLayer.hidden || !sphereComposition) return
+  const centers = sphereComposition.centers()
+  if (arrangeLayer.childElementCount !== centers.length) {
+    arrangeLayer.replaceChildren(...centers.map((_, index) => {
+      const handle = document.createElement('button')
+      handle.type = 'button'
+      handle.className = 'sphere-handle'
+      handle.setAttribute('aria-label', `Move sphere ${index + 1}`)
+      handle.dataset.index = String(index)
+      return handle
+    }))
+  }
+  centers.forEach((center, index) => {
+    const handle = arrangeLayer.children[index] as HTMLButtonElement
+    handle.style.left = `${(center.x + 1) * 50}%`
+    handle.style.top = `${(1 - center.y) * 50}%`
+    handle.classList.toggle('is-selected', index === selectedSphere)
+  })
+}
+function updateSelectedSphere() {
+  if (!sphereComposition) return
+  const point = sphereComposition.point(selectedSphere)
+  for (const input of positionInputs) input.value = String(point[input.dataset.spherePosition as 'x' | 'y' | 'depth'])
+  sphereSelected.value = String(selectedSphere)
+  updateSphereHandles()
+}
+function setSpherePosition(index: number, point: { x: number; y: number; depth: number }) {
+  sphereSettings.positions[String(index)] = {
+    x: THREE.MathUtils.clamp(point.x, -1.15, 1.15),
+    y: THREE.MathUtils.clamp(point.y, -1.15, 1.15),
+    depth: THREE.MathUtils.clamp(point.depth, 0, 1),
+  }
+  applySphereSettings()
+  scheduleAutoSaveScene()
+}
+arrangeLayer.addEventListener('pointerdown', (event) => {
+  const handle = (event.target as HTMLElement).closest<HTMLButtonElement>('.sphere-handle')
+  if (!handle) return
+  selectedSphere = Number(handle.dataset.index)
+  draggingSphere = selectedSphere
+  handle.setPointerCapture(event.pointerId)
+  sphereComposition?.setHovered(selectedSphere)
+  updateSelectedSphere()
+  event.preventDefault()
+})
+arrangeLayer.addEventListener('pointermove', (event) => {
+  const rect = arrangeLayer.getBoundingClientRect()
+  if (draggingSphere >= 0) {
+    const point = sphereComposition?.point(draggingSphere)
+    setSpherePosition(draggingSphere, {
+      x: (event.clientX - rect.left) / rect.width * 2 - 1,
+      y: 1 - (event.clientY - rect.top) / rect.height * 2,
+      depth: point?.depth ?? 0.5,
+    })
+  } else sphereComposition?.setHovered(sphereComposition.hitTest(event.clientX - rect.left, event.clientY - rect.top, rect.width, rect.height))
+})
+arrangeLayer.addEventListener('pointerup', () => { draggingSphere = -1 })
+arrangeLayer.addEventListener('pointercancel', () => { draggingSphere = -1 })
+arrangeLayer.addEventListener('pointerleave', () => { if (draggingSphere < 0) sphereComposition?.setHovered(-1) })
+app.querySelector<HTMLButtonElement>('.sphere-arrange-toggle')!.addEventListener('click', (event) => {
+  arrangeLayer.hidden = !arrangeLayer.hidden
+  ;(event.currentTarget as HTMLButtonElement).setAttribute('aria-pressed', String(!arrangeLayer.hidden))
+  if (arrangeLayer.hidden) sphereComposition?.setHovered(-1)
+  updateSphereHandles()
+})
+sphereSelected.addEventListener('change', () => { selectedSphere = Number(sphereSelected.value); updateSelectedSphere() })
+for (const input of positionInputs) input.addEventListener('input', () => {
+  const key = input.dataset.spherePosition as 'x' | 'y' | 'depth'
+  const point = sphereComposition?.point(selectedSphere) ?? { x: 0, y: 0, depth: 0.5 }
+  setSpherePosition(selectedSphere, { ...point, [key]: Number(input.value) })
+})
+app.querySelector<HTMLButtonElement>('.sphere-reset-selected')!.addEventListener('click', () => {
+  delete sphereSettings.positions[String(selectedSphere)]
+  applySphereSettings()
+  scheduleAutoSaveScene()
+})
 let idleYaw = 0
 let lastFrameTime = 0
 let resumeIdleAt = 0
@@ -554,6 +652,7 @@ function applySettings() {
     output.value = settings[key].toFixed(Number.isInteger(settings[key]) ? 0 : 2) + (unit ?? '')
   }
   sphereComposition?.update(sphereSettings)
+  updateSphereHandles()
   updateBottleDragTarget()
 }
 
@@ -562,6 +661,10 @@ function applySphereSettings() {
     sphereSettings.scaleMin = sphereSettings.scaleMax
   }
   sphereComposition?.update(sphereSettings)
+  const count = Math.round(sphereSettings.count)
+  if (selectedSphere >= count) selectedSphere = Math.max(0, count - 1)
+  sphereSelected.replaceChildren(...Array.from({ length: count }, (_, index) => new Option(`Sphere ${index + 1}`, String(index))))
+  updateSelectedSphere()
   for (const { key } of sphereControls) {
     const input = sphereControlList.querySelector<HTMLInputElement>(`[data-sphere-setting="${key}"]`)!
     const output = sphereControlList.querySelector<HTMLOutputElement>(`[data-sphere-value="${key}"]`)!
@@ -593,7 +696,7 @@ controlList.addEventListener('input', (event) => {
 
 sphereControlList.addEventListener('input', (event) => {
   const input = event.target as HTMLInputElement
-  const key = input.dataset.sphereSetting as keyof SphereSettings | undefined
+  const key = input.dataset.sphereSetting as Exclude<keyof SphereSettings, 'positions'> | undefined
   if (!key) return
   sphereSettings[key] = Number(input.value)
   applySphereSettings()
@@ -617,7 +720,7 @@ app.querySelector<HTMLButtonElement>('[data-ripple-action="reset"]')!.addEventLi
 })
 
 app.querySelector<HTMLButtonElement>('[data-sphere-action="reset"]')!.addEventListener('click', () => {
-  Object.assign(sphereSettings, sphereDefaults)
+  Object.assign(sphereSettings, structuredClone(sphereDefaults))
   applySphereSettings()
   sphereEditorMessage.textContent = 'Sphere settings reset.'
   scheduleAutoSaveScene()
@@ -731,6 +834,8 @@ if (import.meta.env.DEV) {
   })
 }
 renderer.setAnimationLoop((time) => {
+  if (previousSphereFrame) sphereComposition?.tick(Math.min((time - previousSphereFrame) / 1000, 0.05))
+  previousSphereFrame = time
   if (lastFrameTime && !draggingBottle && time >= resumeIdleAt && !document.hidden) {
     idleYaw += Math.min((time - lastFrameTime) / 1000, 0.1) * THREE.MathUtils.degToRad(4)
     bottleRoot.rotation.y = THREE.MathUtils.degToRad(settings.rotationY) + idleYaw
