@@ -21,6 +21,13 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setClearColor(0x000000, 0);
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.querySelector('#app').appendChild(renderer.domElement);
+renderer.domElement.addEventListener('pointermove', (event) => {
+  if (window.parent === window) return;
+  window.parent.postMessage({ type: 'nocturne:sphere-pointer', x: event.clientX, y: event.clientY }, location.origin);
+});
+renderer.domElement.addEventListener('pointerleave', () => {
+  if (window.parent !== window) window.parent.postMessage({ type: 'nocturne:sphere-pointer' }, location.origin);
+});
 
 const DEFAULT_PARTICLE_COUNT = 145_000;
 const PARTICLE_CAPACITY = 160_000;
