@@ -32,7 +32,12 @@ export function mountStudio(config:StudioConfig,hooks:Hooks){
   const gizmo=document.createElement('div');gizmo.className='sphere-gizmo';gizmo.hidden=true;gizmo.innerHTML='<span class="sphere-gizmo-ring"></span><button aria-label="Resize selected sphere" title="Drag to resize sphere">↗</button>';document.body.append(gizmo)
   const draft=()=>{saveDraft(config);status.textContent='Saved in this browser'}
   const record=(snapshot:StudioConfig)=>{if(JSON.stringify(snapshot)===JSON.stringify(config))return;history.push(snapshot);if(history.length>80)history.shift();future=[];draft()}
-  const replace=(next:StudioConfig)=>{Object.assign(config,parseConfig(next));hooks.change('all');refresh()}
+  const replace=(next:StudioConfig)=>{
+    const old=clone(config),loaded=parseConfig(next)
+    const rebuild=old.spheres.length!==loaded.spheres.length||old.spheres.some((sphere,i)=>sphere.id!==loaded.spheres[i].id)
+      ||old.particles.spread!==loaded.particles.spread||old.particles.depth!==loaded.particles.depth||old.particles.cluster!==loaded.particles.cluster||old.camera.sceneDepth!==loaded.camera.sceneDepth
+    Object.assign(config,loaded);hooks.change(rebuild?'all':'snapshot');refresh()
+  }
   const undo=()=>{const prev=history.pop();if(!prev)return;future.push(clone(config));replace(prev);draft()}
   const redo=()=>{const next=future.pop();if(!next)return;history.push(clone(config));replace(next);draft()}
   const doChange=(path:string,value:unknown)=>{setAt(config,path,value);hooks.change(path);refreshSelection();draft()}

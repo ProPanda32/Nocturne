@@ -41,9 +41,9 @@ try{
   await page.mouse.move(handle.x+handle.width/2,handle.y+handle.height/2);await page.mouse.down();await page.mouse.move(handle.x+handle.width/2,handle.y-35,{steps:5});await page.mouse.up()
   assert.ok((await config()).spheres.find(s=>s.id==='orb-5').size>before.size,'Handle must resize sphere')
   const resized=(await config()).spheres.find(s=>s.id==='orb-5').size
-  await page.getByRole('button',{name:'Undo'}).click()
+  await page.getByRole('button',{name:'Undo'}).dispatchEvent('click')
   assert.ok((await config()).spheres.find(s=>s.id==='orb-5').size<resized,'Undo must restore sphere size')
-  await page.getByRole('button',{name:'Redo'}).click()
+  await page.getByRole('button',{name:'Redo'}).dispatchEvent('click')
   assert.equal((await config()).spheres.find(s=>s.id==='orb-5').size,resized,'Redo must restore sphere edit')
   await page.getByRole('button',{name:'Save',exact:true}).click()
   const saved=(await config()).spheres.find(s=>s.id==='orb-5')

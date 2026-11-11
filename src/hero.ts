@@ -137,8 +137,8 @@ async function start() {
     renderer.toneMappingExposure=l.exposure
     camera.position.set(c.x,c.y,c.z);camera.rotation.set(THREE.MathUtils.degToRad(c.pitch),THREE.MathUtils.degToRad(c.yaw),THREE.MathUtils.degToRad(c.roll));camera.zoom=c.zoom
     stage.setLook(config);stage.setBottle(config)
-    if(path==='all'||path.startsWith('particles'))garden?.updateParticles(path)
-    if(path==='all'||path.startsWith('spheres'))config.spheres.forEach(s=>garden?.updateSphere(s))
+    if(path==='all'||path==='snapshot'||path.startsWith('particles'))garden?.updateParticles(path==='snapshot'?'all':path)
+    if(path==='all'||path==='snapshot'||path.startsWith('spheres'))config.spheres.forEach(s=>garden?.updateSphere(s))
     root.rotation.set(pitch,yaw,THREE.MathUtils.degToRad(b.rotationZ))
     resize()
   }
@@ -217,7 +217,7 @@ async function start() {
     const endSphere=()=>{if(dragSphere&&dragStart)studio?.record(dragStart);dragSphere=undefined;dragStart=undefined;canvas.style.cursor='';studio?.persist()}
     canvas.addEventListener('pointerup',endSphere);canvas.addEventListener('pointercancel',endSphere)
     studio=mountStudio(config,{change:(path)=>{if(path==='bottle.rotationY'){yaw=THREE.MathUtils.degToRad(config.bottle.rotationY);angularVelocity=0;settling=false}if(path==='bottle.rotationX'){pitch=THREE.MathUtils.degToRad(config.bottle.rotationX);verticalVelocity=0;settling=false}
-      if(path==='all'){yaw=THREE.MathUtils.degToRad(config.bottle.rotationY);pitch=THREE.MathUtils.degToRad(config.bottle.rotationX)}
+      if(path==='all'||path==='snapshot'){yaw=THREE.MathUtils.degToRad(config.bottle.rotationY);pitch=THREE.MathUtils.degToRad(config.bottle.rotationX);angularVelocity=0;verticalVelocity=0;settling=false}
       if(path.startsWith('particles.spread')||path.startsWith('particles.depth')||path.startsWith('particles.cluster')||path==='camera.sceneDepth'||path==='spheres'||path==='all')rebuildGarden();applyScene(path)},
       select:(id)=>{selected=id},selected:()=>selected,preview:(on)=>{document.body.classList.toggle('creator-preview',on)},viewport:(w,h)=>{document.body.classList.toggle('viewport-preview',!!w);hero.style.width=w?`${w}px`:'';hero.style.height=h?`${h}px`:'';resize();rebuildGarden()},
       spherePosition:(id)=>garden?.sphereWorld(id),camera,canvas})
