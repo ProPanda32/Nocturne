@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "bottle": {
+    "x": 0,
+    "y": 0,
+    "z": 0,
+    "scale": 1,
+    "rotationX": 0,
+    "rotationY": 0,
+    "rotationZ": 0,
+    "glassTint": "#ffffff",
+    "glassRoughness": 0.022,
+    "glassIor": 1.52,
+    "glassTransmission": 1,
+    "liquidTint": "#e8bd77",
+    "liquidAbsorption": 0.32,
+    "capTint": "#ffffff",
+    "goldTint": "#eac07a",
+    "autoRotate": false,
+    "autoSpeed": 0,
+    "dragSensitivity": 1,
+    "inertia": 0.75,
+    "damping": 7,
+    "maxSpeed": 4
+  },
+  "particles": {
+    "count": 1,
+    "size": 1,
+    "opacity": 0.92,
+    "brightness": 1,
+    "speed": 1,
+    "repulsion": 1,
+    "radius": 1,
+    "returnStrength": 3.8,
+    "damping": 3.2,
+    "ambientSpeed": 1,
+    "sphereForce": 1,
+    "attraction": 0,
+    "velocitySensitivity": 1,
+    "mossStrength": 1
+  },
+  "spheres": {},
+  "lighting": {
+    "ambient": 0.25,
+    "key": 2.5,
+    "keyColor": "#ffdfb0",
+    "rim": 2.1,
+    "rimColor": "#ffb963",
+    "exposure": 1
+  },
+  "atmosphere": {
+    "hue": 0,
+    "saturation": 1,
+    "contrast": 1,
+    "brightness": 1,
+    "warmth": 0,
+    "fog": 0,
+    "fogColor": "#101c1e",
+    "glow": 1
+  },
+  "camera": {
+    "x": 0,
+    "y": 0,
+    "distance": 5,
+    "fov": 35
+  },
+  "brushes": [],
+  "brushTool": "Off",
+  "brushSize": 0.1,
+  "brushStrength": 0.4
+}

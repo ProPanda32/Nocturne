@@ -31,6 +31,20 @@ try {
   const page=await browser.newPage()
   page.on('pageerror',e=>errors.push(e.message))
   page.on('console',msg=>{if(msg.type()==='error')errors.push(msg.text())})
+  await page.setViewportSize({width:1366,height:768})
+  await loadHero(page)
+  const mossBefore=await page.evaluate(()=>window.__nocturneProbe())
+  assert.ok(mossBefore.enabled,'Green moss must use the GPU simulation')
+  const heroBox=await page.locator('.site-hero').boundingBox()
+  const hoverX=heroBox.x+(mossBefore.x+1)*heroBox.width/2+24
+  const hoverY=heroBox.y+(1-mossBefore.y)*heroBox.height/2
+  const startFrames=await page.evaluate(()=>window.__nocturneAudit().particleControls.simulationFrames)
+  await page.mouse.move(hoverX,hoverY,{steps:12})
+  assert.equal(await page.evaluate(()=>window.__nocturneAudit().particleControls.pointerActive),1,'Hover must reach the particle simulation')
+  await page.waitForFunction(start=>window.__nocturneAudit().particleControls.simulationFrames>=start+12,startFrames,{timeout:120000})
+  const mossAfter=await page.evaluate(()=>window.__nocturneProbe())
+  const movement=Math.hypot(...mossAfter.offset.map((v,i)=>v-mossBefore.offset[i]))
+  assert.ok(movement>.0003,`GPU hover must displace the green particles (measured ${movement})`)
   for(const [name,width,height] of viewports){
     await page.setViewportSize({width,height})
     await loadHero(page)

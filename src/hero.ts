@@ -5,14 +5,16 @@ import { createGarden } from './garden'
 import { approvedConfig, readDraft } from './studio-config'
 import type { StudioConfig } from './studio-config'
 import './hero.css'
-const creator=import.meta.env.DEV&&location.pathname.endsWith('/creator.html')
-const config:StudioConfig=creator?readDraft():approvedConfig()
+import { loadConfig, saveConfig, production, type SphereTransform } from './studio-config'
+import { createCreatorStudio } from './creator-studio'
+import { createBottleControls, type BottleControls } from './bottle-controls'
 
 const icon = (path:string) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`
 const menuIcon=icon('<path d="M3 6h18M3 12h18M3 18h18"/>')
 const searchIcon=icon('<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>')
 const musicIcon=icon('<path d="M9 18V5l11-2v13M9 9l11-2"/><ellipse cx="6" cy="18" rx="3" ry="2.5"/><ellipse cx="17" cy="16" rx="3" ry="2.5"/>')
 const mailIcon=icon('<rect x="2" y="5" width="20" height="14" rx="1"/><path d="m3 6 9 8 9-8"/>')
+const creatorMode=import.meta.env.DEV && new URLSearchParams(location.search).get('creator')==='1'
 const app=document.querySelector<HTMLDivElement>('#app')!
 app.innerHTML=`
   <a class="skip-link" href="#fragrance">Skip to the collection</a>
@@ -106,6 +108,7 @@ music.addEventListener('click',async()=>{
 })
 
 async function start() {
+  let config=loadConfig(creatorMode)
   const renderer=new THREE.WebGLRenderer({antialias:false,alpha:false,powerPreference:'high-performance'})
   renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1
   layer.append(renderer.domElement)
@@ -119,11 +122,11 @@ async function start() {
   const ambient=new THREE.HemisphereLight('#71848b','#342712',.25);scene.add(ambient)
   const warm=new THREE.PointLight('#ffbf69',2.2,8,2);scene.add(warm)
   let garden:ReturnType<typeof createGarden>|undefined, bottleSize:THREE.Vector3|undefined
-  let floor=.25, yaw=THREE.MathUtils.degToRad(config.bottle.rotationY), pitch=THREE.MathUtils.degToRad(config.bottle.rotationX), angularVelocity=0, verticalVelocity=0, dragging=false,settling=false,lastX=0,lastY=0,lastDragTime=0,previousTime=0,inView=true,quality='auto',pixelCap=1.5,adaptiveLow=false
-  let studio:Awaited<ReturnType<(typeof import('./creator-studio'))['mountStudio']>>|undefined,bottleDragStart:StudioConfig|undefined
-  let lastPointer=new THREE.Vector2(), lastPointerTime=0, rebuildTimer:number|undefined
+  let floor=.25, yaw=0, velocity=0, dragging=false, lastX=0, previousTime=0, inView=true, quality='auto', pixelCap=1.5, adaptiveLow=false, currentDensity=config.particles.count
+  let lastPointer=new THREE.Vector2(), lastPointerTime=0, rebuildTimer:number|undefined, lastDragTime=0
+  let sphereDragging:{id:string;startX:number;startY:number;home:THREE.Vector3}|undefined
   const qualitySelect=app.querySelector<HTMLSelectElement>('#quality')!
-  app.querySelector<HTMLInputElement>('#exposure')!.addEventListener('input',e=>{renderer.toneMappingExposure=Number((e.target as HTMLInputElement).value)})
+  app.querySelector<HTMLInputElement>('#exposure')!.addEventListener('input',e=>{config.lighting.exposure=Number((e.target as HTMLInputElement).value);applyConfig()})
   qualitySelect.addEventListener('change',()=>{quality=qualitySelect.value;adaptiveLow=false;pixelCap=quality==='low'?1:quality==='high'?2:1.5;resize();rebuildGarden()})
   app.querySelector('.reset-view')!.addEventListener('click',()=>{yaw=0;pitch=0;angularVelocity=0;verticalVelocity=0;config.bottle.rotationY=0;config.bottle.rotationX=0;applyScene();studio?.refresh()})
 
@@ -143,6 +146,45 @@ async function start() {
     resize()
   }
 
+  const studio=creatorMode?createCreatorStudio(hero,config,next=>{config=next;applyConfig()}):undefined
+  const visitorControls=creatorMode?undefined:createBottleControls(hero,(settings,reset)=>{
+    applyVisitorSettings(settings,reset)
+  })
+  function applyVisitorSettings(settings:BottleControls,reset:boolean){
+    config.bottle.glassTint=settings.glassTint
+    config.bottle.liquidTint=settings.liquidTint
+    config.bottle.scale=settings.scale
+    config.bottle.glassTransmission=settings.clarity
+    config.bottle.dragSensitivity=production.bottle.dragSensitivity*settings.rotationSpeed
+    config.bottle.inertia=settings.inertia
+    config.lighting.key=production.lighting.key*settings.brightness
+    config.lighting.rim=production.lighting.rim*settings.brightness
+    config.lighting.ambient=production.lighting.ambient*settings.brightness
+    config.lighting.keyColor=settings.lightColorChanged?settings.lightColor:production.lighting.keyColor
+    config.lighting.rimColor=settings.lightColorChanged?settings.lightColor:production.lighting.rimColor
+    if(reset){yaw=0;velocity=0}
+    applyConfig()
+  }
+  if(visitorControls)applyVisitorSettings(visitorControls.settings,false)
+  function applyConfig(){
+    renderer.toneMappingExposure=config.lighting.exposure
+    key.intensity=config.lighting.key;key.color.set(config.lighting.keyColor)
+    rim.intensity=config.lighting.rim;rim.color.set(config.lighting.rimColor)
+    ambient.intensity=config.lighting.ambient
+    warm.intensity=2.2*(visitorControls?.settings.brightness??1)
+    warm.color.set(visitorControls?.settings.lightColorChanged?visitorControls.settings.lightColor:'#ffbf69')
+    camera.position.set(config.camera.x,config.camera.y,config.camera.distance)
+    camera.fov=config.camera.fov+(hero.clientWidth/hero.clientHeight<.9?3:0)
+    camera.updateProjectionMatrix()
+    renderer.domElement.style.filter='hue-rotate('+config.atmosphere.hue+'deg)'
+    stage.setAppearance(config)
+    stage.setBottleFinish(visitorControls?.settings.reflection??1.15,visitorControls?.settings.glow??0)
+    garden?.setControls(config)
+    garden?.syncSpheres(config.spheres)
+    if(garden&&currentDensity!==config.particles.count){currentDensity=config.particles.count;rebuildGarden()}
+    frame()
+    if(creatorMode)saveConfig(config)
+  }
   function frame() {
     if(!bottleSize)return
     const w=hero.clientWidth,h=hero.clientHeight,portrait=w/h<.9
@@ -150,16 +192,15 @@ async function start() {
     // Reference: top 23%, base 74%, centered. Portrait gets its own framing.
     const height=portrait?(h<720?.40:.44):w/h<1.4?.49:.52
     const width=portrait?.59:w/h<1.4?.43:.29
-    const scale=Math.min(viewHeight*height/bottleSize.y,viewHeight*camera.aspect*width/bottleSize.x)*config.bottle.scale*(portrait?config.camera.mobileScale:1)
-    root.scale.setScalar(scale)
-    root.position.set(config.bottle.x,viewHeight*(portrait?.035:.012)+config.bottle.y+viewHeight*(portrait?config.camera.mobileFraming:config.camera.framing),config.bottle.z)
+    const scale=Math.min(viewHeight*height/bottleSize.y,viewHeight*camera.aspect*width/bottleSize.x)
+    root.scale.setScalar(scale*config.bottle.scale)
+    root.position.set(config.bottle.x,viewHeight*(portrait?.035:.012)+config.bottle.y,config.bottle.z)
+    root.rotation.set(config.bottle.rotationX,yaw+config.bottle.rotationY,config.bottle.rotationZ)
     floor=.5+root.position.y/viewHeight-bottleSize.y*scale/viewHeight/2
     target.style.width=`${bottleSize.x*scale/(viewHeight*camera.aspect)*w*1.15}px`
     target.style.height=`${bottleSize.y*scale/viewHeight*h*1.06}px`
-    camera.updateMatrixWorld()
-    const projected=root.position.clone().project(camera)
-    target.style.left=`${(projected.x+1)*50}%`
-    target.style.top=`${(1-projected.y)*50}%`
+    target.style.left=`${(50+(root.position.x-camera.position.x)/(viewHeight*camera.aspect)*100)}%`
+    target.style.top=`${(50-(root.position.y-camera.position.y)/viewHeight*100)}%`
     hero.style.setProperty('--copy-top',`${Math.min(82,Math.max(76,(1-floor)*100+5))}%`)
   }
   function resize() {
@@ -168,18 +209,51 @@ async function start() {
     renderer.setPixelRatio(Math.min(devicePixelRatio,pixelCap,w<700?1.5:2))
     renderer.setSize(w,h,false);frame()
   }
-  function rebuildGarden(){garden?.dispose();garden=createGarden(renderer,scene,camera,stage,hero.clientWidth<700||quality==='low'||adaptiveLow,config);hero.dataset.particles=String(garden.count)}
+  function rebuildGarden(){garden?.dispose();garden=createGarden(renderer,scene,camera,stage,hero.clientWidth<700||quality==='low'||adaptiveLow,config.particles.count);hero.dataset.particles=String(garden.count);studio?.setSphereCount(garden.spheres.map(s=>({x:s.home.x,y:s.home.y,z:s.home.z,scale:s.mesh.scale.x,rotationY:s.mesh.rotation.y})));applyConfig()}
   resize();rebuildGarden()
   const resizeObserver=new ResizeObserver(()=>{resize();window.clearTimeout(rebuildTimer);rebuildTimer=window.setTimeout(rebuildGarden,180)})
   resizeObserver.observe(hero)
 
-  target.addEventListener('pointerdown',e=>{if(e.button!==0)return;dragging=true;bottleDragStart=creator?structuredClone(config):undefined;lastX=e.clientX;lastY=e.clientY;lastDragTime=e.timeStamp;angularVelocity=0;verticalVelocity=0;target.setPointerCapture(e.pointerId);target.classList.add('is-dragging')})
-  target.addEventListener('pointermove',e=>{if(!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY,dt=Math.max((e.timeStamp-lastDragTime)/1000,1/120);lastX=e.clientX;lastY=e.clientY;lastDragTime=e.timeStamp
-    const b=config.bottle;const max=b.maxRotationSpeed;yaw+=dx*b.rotationSensitivity*b.rotationSpeed;pitch=THREE.MathUtils.clamp(pitch+dy*b.verticalSensitivity*b.rotationSpeed,-THREE.MathUtils.degToRad(b.verticalLimit),THREE.MathUtils.degToRad(b.verticalLimit))
-    angularVelocity=THREE.MathUtils.clamp(dx*b.rotationSensitivity*b.rotationSpeed*b.momentumSensitivity/dt,-max,max);verticalVelocity=THREE.MathUtils.clamp(dy*b.verticalSensitivity*b.rotationSpeed*b.momentumSensitivity/dt,-max,max);root.rotation.set(pitch,yaw,root.rotation.z)})
-  const release=()=>{if(dragging&&creator){config.bottle.rotationY=THREE.MathUtils.euclideanModulo(THREE.MathUtils.radToDeg(yaw)+180,360)-180;config.bottle.rotationX=THREE.MathUtils.radToDeg(pitch);if(bottleDragStart)studio?.record(bottleDragStart);studio?.refresh();settling=true}bottleDragStart=undefined;dragging=false;target.classList.remove('is-dragging')}
+  target.addEventListener('pointerdown',e=>{if(e.button!==0||studio?.isBrushActive()||studio?.isSphereEditing())return;dragging=true;lastX=e.clientX;lastDragTime=performance.now();target.setPointerCapture(e.pointerId);target.classList.add('is-dragging')})
+  target.addEventListener('pointermove',e=>{if(!dragging)return;const now=performance.now(),dt=Math.max((now-lastDragTime)/1000,.008);lastDragTime=now;const angle=(e.clientX-lastX)*.004*config.bottle.dragSensitivity;lastX=e.clientX;const measured=THREE.MathUtils.clamp(angle/dt,-config.bottle.maxSpeed,config.bottle.maxSpeed);velocity=THREE.MathUtils.lerp(velocity,measured,.55);yaw+=angle;root.rotation.y=yaw+config.bottle.rotationY})
+  const release=()=>{dragging=false;target.classList.remove('is-dragging')}
   target.addEventListener('pointerup',release);target.addEventListener('pointercancel',release);target.addEventListener('lostpointercapture',release)
-  target.addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();angularVelocity=0;yaw+=(e.key==='ArrowRight'?1:-1)*.15;root.rotation.y=yaw}})
+  target.addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();velocity=0;yaw+=(e.key==='ArrowRight'?1:-1)*.15;root.rotation.y=yaw+config.bottle.rotationY}})
+  if(studio){
+    const picker=new THREE.Raycaster();picker.layers.enable(6);picker.layers.enable(7)
+    const ndc=new THREE.Vector2()
+    hero.addEventListener('pointerdown',e=>{
+      if(e.button!==0||!garden||!studio.isSphereEditing()&&!studio.isBrushActive())return
+      const rect=hero.getBoundingClientRect(),x=(e.clientX-rect.left)/rect.width,y=(e.clientY-rect.top)/rect.height
+      if(studio.isBrushActive()){studio.brushAt(x,y);e.preventDefault();e.stopPropagation();return}
+      ndc.set(x*2-1,1-y*2);picker.setFromCamera(ndc,camera)
+      const found=picker.intersectObjects(garden.spheres.map(s=>s.mesh),false)[0]
+      if(!found)return
+      const i=garden.spheres.findIndex(s=>s.mesh===found.object);if(i<0)return
+      const sphere=garden.spheres[i],id=sphere.id
+      if(!config.spheres[id])config.spheres[id]={x:sphere.home.x,y:sphere.home.y,z:sphere.home.z,scale:sphere.mesh.scale.x,rotationY:sphere.mesh.rotation.y}
+      if(config.spheres[id].locked)return
+      studio.snapshot();studio.selectSphere(id)
+      sphereDragging={id,startX:e.clientX,startY:e.clientY,home:sphere.home.clone()}
+      hero.setPointerCapture(e.pointerId);e.preventDefault();e.stopPropagation()
+    },true)
+    hero.addEventListener('pointermove',e=>{
+      if(!sphereDragging||!garden)return
+      const sphere=garden.spheres.find(s=>s.id===sphereDragging!.id);if(!sphere)return
+      const viewHeight=2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*(camera.position.z-sphereDragging.home.z)
+      const dx=(e.clientX-sphereDragging.startX)/hero.clientWidth*viewHeight*camera.aspect
+      const dy=-(e.clientY-sphereDragging.startY)/hero.clientHeight*viewHeight
+      sphere.home.copy(sphereDragging.home).add(new THREE.Vector3(dx,dy,0))
+      sphere.mesh.position.copy(sphere.home)
+      const transform=config.spheres[sphereDragging.id] as SphereTransform
+      transform.x=sphere.home.x;transform.y=sphere.home.y
+      studio.selectSphere(sphereDragging.id);studio.save()
+      garden.sphereMove(sphere.home,Math.min(Math.hypot(dx,dy)*15,5))
+      e.stopPropagation()
+    },true)
+    const releaseSphere=()=>{sphereDragging=undefined}
+    hero.addEventListener('pointerup',releaseSphere,true);hero.addEventListener('pointercancel',releaseSphere,true)
+  }
   hero.addEventListener('pointermove',e=>{const b=hero.getBoundingClientRect(),x=(e.clientX-b.left)/b.width*2-1,y=1-(e.clientY-b.top)/b.height*2
     const now=performance.now(),delta=Math.max((now-lastPointerTime)/1000,.016)
     const speed=Math.min(Math.hypot(x-lastPointer.x,y-lastPointer.y)/delta,5)
@@ -192,52 +266,21 @@ async function start() {
   const gltf=await new GLTFLoader().loadAsync(new URL('../Public/Assets/Models/nocturne-bottle.glb',import.meta.url).href)
   stage.configure(gltf.scene)
   const bounds=new THREE.Box3().setFromObject(gltf.scene);bottleSize=bounds.getSize(new THREE.Vector3())
-  gltf.scene.position.sub(bounds.getCenter(new THREE.Vector3()));root.add(gltf.scene);frame()
-  target.hidden=false;status.hidden=true;hero.dataset.state='ready';applyScene()
-  if(creator){
-    const {mountStudio}=await import('./creator-studio')
-    const raycaster=new THREE.Raycaster(),pointerNdc=new THREE.Vector2(),plane=new THREE.Plane(),hit=new THREE.Vector3()
-    raycaster.layers.enable(6);raycaster.layers.enable(7)
-    let selected:string|undefined,dragSphere:string|undefined,dragStart:StudioConfig|undefined,sphereLast=0
-    const canvas=renderer.domElement
-    const locate=(e:PointerEvent)=>{const bounds=canvas.getBoundingClientRect();pointerNdc.set((e.clientX-bounds.left)/bounds.width*2-1,1-(e.clientY-bounds.top)/bounds.height*2);raycaster.setFromCamera(pointerNdc,camera)}
-    canvas.addEventListener('pointerdown',e=>{if(!studio?.sphereMode||e.button!==0)return;locate(e)
-      const intersection=raycaster.intersectObjects(garden?.spheres.map(s=>s.mesh)||[])[0]
-      if(!intersection){selected=undefined;studio?.selectSphere(undefined);return}
-      const sphere=intersection.object.userData.sphereId as string;selected=sphere;studio?.selectSphere(sphere)
-      if(config.spheres.find(s=>s.id===sphere)?.locked)return
-      dragSphere=sphere;dragStart=structuredClone(config);sphereLast=e.timeStamp;plane.setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()),intersection.object.position);canvas.setPointerCapture(e.pointerId);canvas.style.cursor='grabbing'
-    })
-    canvas.addEventListener('pointermove',e=>{if(!dragSphere)return;locate(e);if(!raycaster.ray.intersectPlane(plane,hit))return
-      const sphere=config.spheres.find(s=>s.id===dragSphere);if(!sphere)return
-      const z=sphere.z,view=2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*(camera.position.z-z)
-      sphere.x=hit.x/(view*camera.aspect/2);sphere.y=hit.y/(view/2)
-      garden?.updateSphere(sphere);garden?.moveSphere(sphere.id,Math.min(5,Math.hypot(e.movementX,e.movementY)/Math.max((e.timeStamp-sphereLast)/1000,.016)/300)*sphere.interaction);sphereLast=e.timeStamp;studio?.refreshSelection()
-    })
-    const endSphere=()=>{if(dragSphere&&dragStart)studio?.record(dragStart);dragSphere=undefined;dragStart=undefined;canvas.style.cursor='';studio?.persist()}
-    canvas.addEventListener('pointerup',endSphere);canvas.addEventListener('pointercancel',endSphere)
-    studio=mountStudio(config,{change:(path)=>{if(path==='bottle.rotationY'){yaw=THREE.MathUtils.degToRad(config.bottle.rotationY);angularVelocity=0;settling=false}if(path==='bottle.rotationX'){pitch=THREE.MathUtils.degToRad(config.bottle.rotationX);verticalVelocity=0;settling=false}
-      if(path==='all'||path==='snapshot'){yaw=THREE.MathUtils.degToRad(config.bottle.rotationY);pitch=THREE.MathUtils.degToRad(config.bottle.rotationX);angularVelocity=0;verticalVelocity=0;settling=false}
-      if(path.startsWith('particles.spread')||path.startsWith('particles.depth')||path.startsWith('particles.cluster')||path==='camera.sceneDepth'||path==='spheres'||path==='all')rebuildGarden();applyScene(path)},
-      select:(id)=>{selected=id},selected:()=>selected,preview:(on)=>{document.body.classList.toggle('creator-preview',on)},viewport:(w,h)=>{document.body.classList.toggle('viewport-preview',!!w);hero.style.width=w?`${w}px`:'';hero.style.height=h?`${h}px`:'';resize();rebuildGarden()},
-      spherePosition:(id)=>garden?.sphereWorld(id),camera,canvas})
-  }
+  gltf.scene.position.sub(bounds.getCenter(new THREE.Vector3()));root.add(gltf.scene);applyConfig()
+  target.hidden=false;status.hidden=true;hero.dataset.state='ready'
   let frameCount=0,slowFrames=0,activeTime=0
   renderer.setAnimationLoop(now=>{
     const delta=previousTime?Math.min((now-previousTime)/1000,.05):1/60;previousTime=now
     if(document.hidden||!inView)return
     activeTime+=delta
-    if(!dragging){const b=config.bottle;angularVelocity*=Math.exp(-delta*(b.damping/Math.max(b.inertia,.05)+b.friction));verticalVelocity*=Math.exp(-delta*(b.damping/Math.max(b.inertia,.05)+b.friction));if(reduced){angularVelocity=0;verticalVelocity=0}
-      yaw+=(angularVelocity+(b.autoRotate&&!reduced?b.autoSpeed:0))*delta;pitch=THREE.MathUtils.clamp(pitch+verticalVelocity*delta,-THREE.MathUtils.degToRad(b.verticalLimit),THREE.MathUtils.degToRad(b.verticalLimit));root.rotation.set(pitch,yaw,THREE.MathUtils.degToRad(b.rotationZ))
-      if(settling&&Math.abs(angularVelocity)+Math.abs(verticalVelocity)<.005){settling=false;b.rotationY=THREE.MathUtils.euclideanModulo(THREE.MathUtils.radToDeg(yaw)+180,360)-180;b.rotationX=THREE.MathUtils.radToDeg(pitch);studio?.persist();studio?.refresh()}}
+    if(!dragging){velocity*=Math.exp(-delta*config.bottle.damping*(1.5-config.bottle.inertia));if(reduced)velocity=0;yaw+=(velocity+(config.bottle.autoRotate?config.bottle.autoSpeed:0))*delta;root.rotation.y=yaw+config.bottle.rotationY}
     garden?.tick(activeTime,delta,reduced);stage.render(activeTime,floor,reduced)
     frameCount++
     if(quality==='auto' && frameCount>120){if(delta>.03)slowFrames++;if(frameCount===240){if(slowFrames>85&&pixelCap>1){pixelCap=1;adaptiveLow=true;resize();rebuildGarden()}frameCount=0;slowFrames=0}}
     // Inspectable diagnostics without making the production scene mutable.
     if(frameCount%60===0){hero.dataset.rotation=yaw.toFixed(3);hero.dataset.pixelRatio=String(renderer.getPixelRatio());hero.dataset.frameMs=(delta*1000).toFixed(1)}
   })
-  if(import.meta.env.DEV)Object.assign(window,{__nocturneAudit:()=>({bottle:stage.audit(),particles:garden?.count,rotation:yaw,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,pixelRatio:renderer.getPixelRatio(),sphereCount:garden?.spheres.length,config:creator?config:undefined}),
-    __nocturneStudioAudit:()=>({garden:garden?.audit(),lights:{key:key.intensity,fill:rim.intensity,rim:moon.intensity},look:stage.lookAudit(),camera:{fov:camera.fov,position:camera.position.toArray()},bottle:{glass:stage.audit().find(m=>m.role==='glass'),liquid:stage.audit().find(m=>m.role==='liquid'),angularVelocity,yaw},brushStrokes:config.brush.strokes.length,spherePixels:garden?.spheres.map(s=>{const p=s.mesh.position.clone().project(camera);return {id:s.id,x:(p.x+1)*hero.clientWidth/2,y:(1-p.y)*hero.clientHeight/2}})})})
+  if(import.meta.env.DEV)Object.assign(window,{__nocturneProbe:()=>garden?.probeMoss(),__nocturneAudit:()=>({bottle:stage.audit(),bottleScale:root.scale.x,bottleGlow:stage.glow(),particles:garden?.count,rotation:yaw,renderFrames:frameCount,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,pixelRatio:renderer.getPixelRatio(),creator:creatorMode,config:studio?.config,lights:{key:key.intensity,keyColor:key.color.getHexString(),rim:rim.intensity,rimColor:rim.color.getHexString(),ambient:ambient.intensity,warm:warm.intensity},camera:{x:camera.position.x,y:camera.position.y,z:camera.position.z,fov:camera.fov},particleControls:garden?.audit(),spheres:garden?.spheres.map(s=>{const p=s.mesh.position.clone().project(camera);return{x:(p.x+1)*hero.clientWidth/2,y:(1-p.y)*hero.clientHeight/2}})})})
   window.addEventListener('pagehide',()=>{renderer.setAnimationLoop(null);observer.disconnect();resizeObserver.disconnect();garden?.dispose();stage.dispose();renderer.dispose();void audio?.close()},{once:true})
   window.addEventListener('pageshow',event=>{if(event.persisted)location.reload()})
 }

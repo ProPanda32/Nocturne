@@ -1,0 +1,19 @@
+.bottle-controls{position:absolute;inset:0;z-index:4;pointer-events:none;color:#f0e8d8;font:11px/1.4 Georgia,serif}
+.bottle-controls-panel{position:absolute;top:34%;width:clamp(160px,15vw,216px);pointer-events:auto;background:#101913bf;border:1px solid #bb9c694d;backdrop-filter:blur(12px);box-shadow:0 12px 32px #0006}
+.bottle-controls-appearance{left:clamp(18px,5vw,100px)}
+.bottle-controls-motion{right:clamp(18px,5vw,100px)}
+.bottle-controls-panel summary{list-style:none;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;padding:11px 13px;letter-spacing:.11em;text-transform:uppercase;font:10px/1.5 Arial,sans-serif}
+.bottle-controls-panel summary::-webkit-details-marker{display:none}
+.bottle-controls-panel summary span{font-size:18px;line-height:10px;color:#d8b67a}
+.bottle-controls-panel[open] summary span{transform:rotate(45deg)}
+.bottle-controls-fields{display:grid;gap:13px;border-top:1px solid #bb9c6940;padding:15px 13px 16px}
+.bottle-control{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:22px}
+.bottle-control span{max-width:97px}
+.bottle-control input[type=range]{width:80px;min-width:0;accent-color:#d1a76d;cursor:pointer}
+.bottle-control input[type=color]{width:34px;height:25px;padding:0;border:1px solid #bca67d;background:transparent;cursor:pointer}
+.bottle-controls-reset{background:none;border:0;border-top:1px solid #bb9c6940;padding:13px 0 0;text-align:left;color:#d9bd8c;font:10px Arial,sans-serif;letter-spacing:.05em}
+.bottle-controls-note{color:#c3bbaa;font:10px/1.4 Arial,sans-serif}
+.bottle-controls-panel summary:focus-visible,.bottle-controls-reset:focus-visible{outline:1px solid #ddba7d;outline-offset:3px}
+@media(max-width:900px){.bottle-controls-panel{top:24%;width:clamp(142px,20vw,180px)}.bottle-controls-appearance{left:12px}.bottle-controls-motion{right:12px}}
+@media(max-width:700px){.bottle-controls-panel{top:23%;width:min(42vw,170px)}.bottle-controls-panel summary{padding:9px 10px;font-size:9px}.bottle-controls-panel[open]{width:min(42vw,170px)}.bottle-controls-fields{gap:8px;padding:10px}.bottle-control{display:grid;gap:3px}.bottle-control span{max-width:none;font-size:10px}.bottle-control input[type=range]{width:100%}.bottle-control input[type=color]{width:36px}.bottle-controls-reset{font-size:9px;padding-top:8px}}
+@media(max-height:570px){.bottle-controls-panel{top:20%}.bottle-controls-fields{max-height:48svh;overflow-y:auto}}

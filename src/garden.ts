@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { GPUComputationRenderer } from 'three/addons/misc/GPUComputationRenderer.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { WORLD } from './optical-stage'
-import type { SphereConfig, StudioConfig } from './studio-config'
+import type { StudioConfig, SphereTransform } from './studio-config'
 
 export function seeded(seed: number) {
   return () => { seed |= 0; seed = seed + 0x6d2b79f5 | 0; let t = Math.imul(seed ^ seed >>> 15,1 | seed);
@@ -13,7 +13,7 @@ const palette = ['#bc9248','#e6d7b1','#a75179','#683d72','#40522c','#d9aa71']
 
 /** One deterministic 3D garden. Screen-space anchors are recomposed for portrait;
  * depth, real geometry and camera projection provide perspective and parallax. */
-export function createGarden(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, stage: Stage, compact: boolean, config: StudioConfig) {
+export function createGarden(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, stage: Stage, compact: boolean, density=1) {
   const root = new THREE.Group(); root.name = 'Living garden'; scene.add(root)
   const random = seeded(83107)
   const aspect = camera.aspect
@@ -41,10 +41,20 @@ export function createGarden(renderer: THREE.WebGLRenderer, scene: THREE.Scene, 
   }
   const dummy = new THREE.Object3D()
   const color = new THREE.Color()
+  const mossPositions:THREE.Vector3[]=[]
+  const mossOffset={value:null as THREE.Texture|null}
+  const mossEnabled={value:0}
+  const mossStrength={value:1}
   const mossMaterial = new THREE.MeshStandardMaterial({color:'#76813d',roughness:.82,metalness:.08})
   mossMaterial.onBeforeCompile = s => {
-    s.vertexShader=s.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 mossPosition;')
+    Object.assign(s.uniforms,{mossOffset,mossEnabled,mossStrength,hoverPointer:pointer,hoverActive:active,hoverSpeed:speed,hoverRadius:radius,hoverRepulsion:repulsion,hoverAttraction:attraction,hoverSensitivity:velocitySensitivity})
+    s.vertexShader=s.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 mossPosition; attribute vec2 simRef; uniform sampler2D mossOffset; uniform float mossEnabled,mossStrength; uniform vec2 hoverPointer; uniform float hoverActive,hoverSpeed,hoverRadius,hoverRepulsion,hoverAttraction,hoverSensitivity;')
       .replace('#include <begin_vertex>','#include <begin_vertex>\nmossPosition=position;')
+      .replace('#include <project_vertex>',THREE.ShaderChunk.project_vertex.replace('mvPosition = instanceMatrix * mvPosition;', 'mvPosition = instanceMatrix * mvPosition; mvPosition.xyz += texture2D(mossOffset,simRef).xyz*mossEnabled*mossStrength;')+`
+        vec2 hoverDelta=gl_Position.xy/max(gl_Position.w,.001)-hoverPointer;
+        float hoverFalloff=exp(-dot(hoverDelta,hoverDelta)*4./max(hoverRadius*hoverRadius*.0324,.0001));
+        float hoverDistance=(.022+min(hoverSpeed*hoverSensitivity,4.)*.009)*hoverActive*hoverFalloff*hoverRepulsion*mossStrength*(1.-2.*hoverAttraction);
+        gl_Position.xy+=normalize(hoverDelta+vec2(.0001))*hoverDistance*gl_Position.w;`)
     s.fragmentShader=s.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 mossPosition;')
       .replace('#include <color_fragment>',`#include <color_fragment>
         float n=sin(mossPosition.x*43.)*sin(mossPosition.y*47.)*sin(mossPosition.z*39.);
@@ -55,6 +65,7 @@ export function createGarden(renderer: THREE.WebGLRenderer, scene: THREE.Scene, 
   moss.name='Moss and lichen'; moss.layers.set(WORLD)
   for(let i=0;i<mossCount;i++) {
     dummy.position.copy(sample()); const size=r(.006,.024)
+    mossPositions.push(dummy.position.clone())
     dummy.scale.set(size*r(.6,1.7),size*r(.6,1.5),size)
     dummy.rotation.set(r(0,6),r(0,6),r(0,6)); dummy.updateMatrix(); moss.setMatrixAt(i,dummy.matrix)
     color.setHSL(r(.17,.28),r(.25,.65),r(.02,.13)); moss.setColorAt(i,color)
@@ -114,7 +125,15 @@ export function createGarden(renderer: THREE.WebGLRenderer, scene: THREE.Scene, 
     m.customProgramCacheKey=()=> 'garden-orb'
   }
   const gold=new THREE.MeshStandardMaterial({color:'#b88b42',metalness:.94,roughness:.2})
-  const mossOrb=mossMaterial.clone();mossOrb.color.set('#263813');mossOrb.onBeforeCompile=mossMaterial.onBeforeCompile
+  const mossOrb=mossMaterial.clone();mossOrb.color.set('#263813')
+  mossOrb.onBeforeCompile=s=>{
+    s.vertexShader=s.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 mossPosition;')
+      .replace('#include <begin_vertex>','#include <begin_vertex>\nmossPosition=position;')
+    s.fragmentShader=s.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 mossPosition;')
+      .replace('#include <color_fragment>',`#include <color_fragment>
+        float n=sin(mossPosition.x*43.)*sin(mossPosition.y*47.)*sin(mossPosition.z*39.);
+        diffuseColor.rgb*=.55+.45*smoothstep(-.7,.8,n);`)
+  }
   const mossGeometry=new THREE.IcosahedronGeometry(1,3)
   const mossVertices=mossGeometry.attributes.position
   for(let i=0;i<mossVertices.count;i++){
@@ -124,8 +143,7 @@ export function createGarden(renderer: THREE.WebGLRenderer, scene: THREE.Scene, 
   }
   mossGeometry.computeVertexNormals()
   const materials=[glass,pink,amber,mossOrb,pearl,gold]
-  const spheres: {mesh:THREE.Mesh,home:THREE.Vector3,phase:number,id:string}[]=[]
-  const kindIndex:Record<SphereConfig['kind'],number>={glass:0,pink:1,amber:2,moss:3,pearl:4,gold:5}
+  const spheres: {id:string,mesh:THREE.Mesh,home:THREE.Vector3,phase:number}[]=[]
   const orbGeometry=new THREE.SphereGeometry(1,32,24)
   // Large accents are deliberately sparse. Depth-of-field softens these edges.
   function addSphere(sphere:SphereConfig){
@@ -133,9 +151,7 @@ export function createGarden(renderer: THREE.WebGLRenderer, scene: THREE.Scene, 
     const mesh=new THREE.Mesh(kind===3?mossGeometry:orbGeometry,materials[kind].clone())
     mesh.layers.set([0,1,2].includes(kind)?7:WORLD)
     mesh.name=['Clear bubble','Rose glass','Amber glass','Moss sphere','Veined pearl','Gold bead'][kind]
-    mesh.userData.sphereId=sphere.id;root.add(mesh)
-    const entry={mesh,home:new THREE.Vector3(),phase:random()*6,id:sphere.id};spheres.push(entry)
-    updateSphere(sphere)
+    root.add(mesh);spheres.push({id:String(i),mesh,home:mesh.position.clone(),phase:random()*6})
   }
   function updateSphere(sphere:SphereConfig){
     const entry=spheres.find(s=>s.id===sphere.id);if(!entry)return
@@ -168,9 +184,16 @@ export function createGarden(renderer: THREE.WebGLRenderer, scene: THREE.Scene, 
   }
   root.add(beads)
 
-  const dimension=compact?96:160, count=dimension*dimension
+  const visibleCount=Math.round((compact?96:160)**2*Math.max(.2,Math.min(1.5,density)))
+  const dimension=Math.ceil(Math.sqrt(mossCount+visibleCount)), count=dimension*dimension-mossCount
   const gpu=new GPUComputationRenderer(dimension,dimension,renderer)
   const origin=gpu.createTexture(), zero=gpu.createTexture()
+  const mossRefs=new Float32Array(mossCount*2)
+  for(let i=0;i<mossCount;i++){
+    const p=mossPositions[i];origin.image.data.set([p.x,p.y,p.z,random()*6.28],i*4)
+    mossRefs.set([(i%dimension+.5)/dimension,(Math.floor(i/dimension)+.5)/dimension],i*2)
+  }
+  moss.geometry.setAttribute('simRef',new THREE.InstancedBufferAttribute(mossRefs,2))
   const positions=new Float32Array(count*3), refs=new Float32Array(count*2), colors=new Float32Array(count*3), sizes=new Float32Array(count)
   for(let i=0;i<count;i++) {
     let p=sample()
@@ -179,91 +202,128 @@ export function createGarden(renderer: THREE.WebGLRenderer, scene: THREE.Scene, 
       if(Math.abs(x)<exclusion && y>-.48&&y<.67)x+=(x<0?-1:1)*exclusion
       p=world(x,y,r(-4.8,.65))
     }
-    positions.set(p.toArray(),i*3);origin.image.data.set([p.x,p.y,p.z,random()*6.28],i*4)
-    refs.set([(i%dimension+.5)/dimension,(Math.floor(i/dimension)+.5)/dimension],i*2)
+    const texel=i+mossCount
+    positions.set(p.toArray(),i*3);origin.image.data.set([p.x,p.y,p.z,random()*6.28],texel*4)
+    refs.set([(texel%dimension+.5)/dimension,(Math.floor(texel/dimension)+.5)/dimension],i*2)
     const botanical=Math.sin(p.x*2.1+Math.sin(p.y*3.3)+p.z*.65)
     const hue=botanical>.45?2:botanical<-.25?4:random()<.11?1:0
     color.set(hue===2?particleSettings.secondaryColor:hue===0?particleSettings.color:palette[hue]).multiplyScalar(r(.3,hue===4?1.1:2.2));colors.set(color.toArray(),i*3)
     sizes[i]=i%127===0?r(4,7):r(1.1,3.8)
   }
-  const pointer={value:new THREE.Vector3(99,99,0)}, speed={value:0}, dt={value:1/60}, elapsed={value:0}, active={value:0}
-  const spherePointer={value:new THREE.Vector3(99,99,0)},sphereSpeed={value:0}
+  const pointer={value:new THREE.Vector2(99,99)}, particleCameraEye={value:camera.position.clone()}, projectionScale={value:new THREE.Vector2()}, speed={value:0}, dt={value:1/60}, elapsed={value:0}, active={value:0}
+  const repulsion={value:1}, radius={value:1}, returnStrength={value:3.8}, damping={value:3.2}, motionScale={value:1}, ambientSpeed={value:1}, attraction={value:0}, velocitySensitivity={value:1}, sphereForce={value:1}, spherePointer={value:new THREE.Vector3(99,99,0)}, sphereSpeed={value:0}
   const velocity=gpu.addVariable('velocity',`
-    uniform sampler2D origins;uniform vec3 pointer,spherePointer;uniform float dt,speed,pointerActive,sphereSpeed;
-    uniform float radius,repulsion,attraction,velocitySensitivity,momentum,damping,returnStrength,sphereStrength,turbulence;
+    uniform sampler2D origins;uniform vec2 pointer,projectionScale;uniform vec3 particleCameraEye,spherePointer;uniform float dt,speed,pointerActive,repulsion,radius,returnStrength,damping,motionScale,attraction,velocitySensitivity,sphereForce,sphereSpeed;
     void main(){vec2 uv=gl_FragCoord.xy/resolution.xy;
       vec3 p=texture2D(origins,uv).xyz;vec3 o=texture2D(offsets,uv).xyz;vec3 v=texture2D(velocity,uv).xyz;
-      vec3 d=p+o-pointer;d.z*=.15;float influence=exp(-dot(d,d)*8./max(radius*radius,.01))*pointerActive;
-      vec3 direction=normalize(d+vec3(.0001));
-      vec3 force=direction*influence*(repulsion-attraction)*(.035+min(speed*velocitySensitivity,4.)*.7);
-      vec3 sd=p+o-spherePointer;sd.z*=.2;
-      force+=normalize(sd+vec3(.0001))*exp(-dot(sd,sd)*6.)*min(sphereSpeed,4.)*sphereStrength*.45;
-      force+=vec3(sin(p.y*8.+p.z*3.),cos(p.x*6.+p.z),sin(p.x*4.))*.002*turbulence;
-      v+=(force-o*returnStrength)*dt;v*=exp(-dt*damping/max(momentum,.05));
-      gl_FragColor=vec4(clamp(v,vec3(-.8),vec3(.8)),1.);}`,zero)
+      vec3 location=p+o;vec2 projected=(location.xy-particleCameraEye.xy)*projectionScale/max(particleCameraEye.z-location.z,.1);
+      vec2 d=projected-pointer;float influence=exp(-dot(d,d)*4./max(radius*radius*.0324,.0001))*pointerActive;
+      vec3 force=normalize(vec3(d.x/projectionScale.x,d.y/projectionScale.y,.0001))*influence*(1.+min(speed*velocitySensitivity*40.,18.))*repulsion*(1.-2.*attraction);
+      vec3 sd=p+o-spherePointer;float si=exp(-dot(sd,sd)*4.);force+=normalize(sd+vec3(.0001))*si*sphereSpeed*sphereForce*.4;
+      v+=(force-o*returnStrength)*dt*motionScale;v*=exp(-dt*damping);
+      gl_FragColor=vec4(clamp(v,vec3(-2.),vec3(2.)),1.);}`,zero)
   const offsets=gpu.addVariable('offsets',`uniform float dt;void main(){vec2 uv=gl_FragCoord.xy/resolution.xy;vec3 p=texture2D(offsets,uv).xyz;vec3 v=texture2D(velocity,uv).xyz;gl_FragColor=vec4(p+v*dt,1.);}`,zero.clone())
   gpu.setVariableDependencies(velocity,[velocity,offsets]);gpu.setVariableDependencies(offsets,[velocity,offsets])
-  Object.assign(velocity.material.uniforms,{origins:{value:origin},pointer,speed,dt,pointerActive:active,spherePointer,sphereSpeed,
-    radius:{value:particleSettings.radius},repulsion:{value:particleSettings.repulsion},attraction:{value:particleSettings.attraction},velocitySensitivity:{value:particleSettings.velocitySensitivity},momentum:{value:particleSettings.momentum},damping:{value:particleSettings.damping},returnStrength:{value:particleSettings.returnStrength},sphereStrength:{value:particleSettings.sphereStrength},turbulence:{value:particleSettings.turbulence}})
+  Object.assign(velocity.material.uniforms,{origins:{value:origin},pointer,particleCameraEye,projectionScale,speed,dt,pointerActive:active,repulsion,radius,returnStrength,damping,motionScale,attraction,velocitySensitivity,sphereForce,spherePointer,sphereSpeed})
   offsets.material.uniforms.dt=dt
   const gpuError=gpu.init()
+  mossOffset.value=zero;mossEnabled.value=gpuError?0:1
   if(gpuError) console.warn('Particle simulation unavailable; using animated vertex field:',gpuError)
   const material=new THREE.ShaderMaterial({
     transparent:true,depthWrite:false,blending:THREE.NormalBlending,
-    uniforms:{offsetMap:{value:zero},simulate:{value:gpuError?0:1},time:elapsed,pixelRatio:{value:renderer.getPixelRatio()},sizeScale:{value:1},sizeVariation:{value:1},hue:{value:0},saturation:{value:1},brightness:{value:1},opacity:{value:.92},glow:{value:1},ambientSpeed:{value:1}},
+    uniforms:{offsetMap:{value:zero},simulate:{value:gpuError?0:1},time:elapsed,pixelRatio:{value:renderer.getPixelRatio()},sizeMultiplier:{value:1},opacityMultiplier:{value:.92},brightnessMultiplier:{value:1},ambientSpeed,hoverPointer:pointer,hoverActive:active,hoverSpeed:speed,hoverRadius:radius,hoverRepulsion:repulsion,hoverAttraction:attraction,hoverSensitivity:velocitySensitivity},
     vertexShader:`attribute vec2 reference;attribute float beadSize;attribute vec3 tint;
-      uniform sampler2D offsetMap;uniform float simulate,time,pixelRatio,sizeScale,sizeVariation,ambientSpeed;varying vec3 vColor;varying float fog;
+      uniform sampler2D offsetMap;uniform vec2 hoverPointer;uniform float simulate,time,pixelRatio,sizeMultiplier,ambientSpeed,hoverActive,hoverSpeed,hoverRadius,hoverRepulsion,hoverAttraction,hoverSensitivity;varying vec3 vColor;varying float fog;
       void main(){vec3 p=position+texture2D(offsetMap,reference).xyz*simulate;
-        p+=vec3(sin(time*.18*ambientSpeed+p.y*3.),cos(time*.13*ambientSpeed+p.x*2.),0.)*.009;
+        p+=vec3(sin(time*ambientSpeed*.18+p.y*3.),cos(time*ambientSpeed*.13+p.x*2.),0.)*.009;
         vec4 v=modelViewMatrix*vec4(p,1.);gl_Position=projectionMatrix*v;
-        gl_PointSize=clamp(mix(2.,beadSize,sizeVariation)*sizeScale*pixelRatio*5./-v.z,1.,14.);vColor=tint;fog=exp(-max(-v.z-6.,0.)*.08);}`,
-    fragmentShader:`uniform float hue,saturation,brightness,opacity,glow;varying vec3 vColor;varying float fog;void main(){vec2 p=gl_PointCoord*2.-1.;float r=dot(p,p);if(r>1.)discard;
+        vec2 hoverDelta=gl_Position.xy/max(gl_Position.w,.001)-hoverPointer;
+        float hoverFalloff=exp(-dot(hoverDelta,hoverDelta)*4./max(hoverRadius*hoverRadius*.0324,.0001));
+        float hoverDistance=(.022+min(hoverSpeed*hoverSensitivity,4.)*.009)*hoverActive*hoverFalloff*hoverRepulsion*(1.-2.*hoverAttraction);
+        gl_Position.xy+=normalize(hoverDelta+vec2(.0001))*hoverDistance*gl_Position.w;
+        gl_PointSize=clamp(beadSize*sizeMultiplier*pixelRatio*5./-v.z,1.,14.);vColor=tint;fog=exp(-max(-v.z-6.,0.)*.08);}`,
+    fragmentShader:`varying vec3 vColor;varying float fog;uniform float opacityMultiplier,brightnessMultiplier;void main(){vec2 p=gl_PointCoord*2.-1.;float r=dot(p,p);if(r>1.)discard;
       float z=sqrt(1.-r);vec3 n=vec3(p,z);float diffuse=.18+.55*max(dot(n,normalize(vec3(-.6,.8,1.))),0.);
       float spec=pow(max(dot(n,normalize(vec3(-.4,.5,1.))),0.),30.);
-      vec3 c=vColor*(diffuse+.18)+mix(vColor,vec3(1.3,.93,.57),.3)*spec*glow;
-      float angle=hue*6.2831853;mat3 rotate=mat3(.299+.701*cos(angle)+.168*sin(angle),.587-.587*cos(angle)+.330*sin(angle),.114-.114*cos(angle)-.497*sin(angle),.299-.299*cos(angle)-.328*sin(angle),.587+.413*cos(angle)+.035*sin(angle),.114-.114*cos(angle)+.292*sin(angle),.299-.3*cos(angle)+1.25*sin(angle),.587-.588*cos(angle)-1.05*sin(angle),.114+.886*cos(angle)-.203*sin(angle));
-      c=max(rotate*c,vec3(0.));c=mix(vec3(dot(c,vec3(.299,.587,.114))),c,saturation)*brightness;
-      gl_FragColor=vec4(c*fog,(1.-smoothstep(.64,1.,r))*opacity);}`,
+      vec3 c=vColor*(diffuse+.18)+mix(vColor,vec3(1.3,.93,.57),.3)*spec;
+      gl_FragColor=vec4(c*fog*brightnessMultiplier,(1.-smoothstep(.64,1.,r))*opacityMultiplier);}`,
   })
   const geometry=new THREE.BufferGeometry()
   geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));geometry.setAttribute('reference',new THREE.BufferAttribute(refs,2))
   geometry.setAttribute('tint',new THREE.BufferAttribute(colors,3));geometry.setAttribute('beadSize',new THREE.BufferAttribute(sizes,1))
   const particles=new THREE.Points(geometry,material);particles.layers.set(WORLD);particles.frustumCulled=false;particles.name='GPU botanical bead field';root.add(particles)
   const drawingSize=new THREE.Vector2()
-  function updateParticles(change='all'){
-    const settings=config.particles
-    geometry.setDrawRange(0,Math.min(count,Math.round(settings.count*settings.density*(compact?9216/25600:1))))
-    for(const key of ['size','sizeVariation','hue','saturation','brightness','opacity','glow','ambientSpeed'] as const)material.uniforms[key==='size'?'sizeScale':key].value=settings[key]
-    for(const key of ['radius','repulsion','attraction','velocitySensitivity','momentum','damping','returnStrength','sphereStrength','turbulence'] as const)velocity.material.uniforms[key].value=settings[key]
-    if(change==='all'||change==='particles.color'||change==='particles.secondaryColor'){
-      const base=new THREE.Color(settings.color),secondary=new THREE.Color(settings.secondaryColor)
-      for(let i=0;i<count;i++)if(i%5!==4){const source=i%3===0?secondary:base;colors[i*3]=source.r*(.35+(i%7)*.18);colors[i*3+1]=source.g*(.35+(i%7)*.18);colors[i*3+2]=source.b*(.35+(i%7)*.18)}
-      geometry.attributes.tint.needsUpdate=true
+  let simulationFrames=0
+  function probeMoss(){
+    const projection=new THREE.Vector3(), readback=new Float32Array(4), velocityReadback=new Float32Array(4)
+    let index=0, nearest=Infinity
+    for(let i=0;i<mossPositions.length;i++){
+      projection.copy(mossPositions[i]).project(camera)
+      const distance=(projection.x-.55)**2+(projection.y-.12)**2
+      if(projection.z<1&&distance<nearest){nearest=distance;index=i}
+    }
+    projection.copy(mossPositions[index]).project(camera)
+    if(!gpuError){
+      renderer.readRenderTargetPixels(gpu.getCurrentRenderTarget(offsets),index%dimension,Math.floor(index/dimension),1,1,readback)
+      renderer.readRenderTargetPixels(gpu.getCurrentRenderTarget(velocity),index%dimension,Math.floor(index/dimension),1,1,velocityReadback)
+    }
+    return {x:projection.x,y:projection.y,origin:mossPositions[index].toArray(),offset:[readback[0],readback[1],readback[2]],velocity:[velocityReadback[0],velocityReadback[1],velocityReadback[2]],pointer:[pointer.value.x,pointer.value.y],active:active.value,frames:simulationFrames,enabled:!gpuError}
+  }
+  const sphereMaterials={glass,pink,amber,moss:mossOrb,cream:pearl,gold}
+  function syncSpheres(settings:Record<string,SphereTransform>){
+    for(const [id,saved] of Object.entries(settings)){
+      let sphere=spheres.find(s=>s.id===id)
+      if(!sphere && id.startsWith('extra-')){
+        const mesh=new THREE.Mesh(orbGeometry,glass.clone());mesh.layers.set(7);root.add(mesh)
+        sphere={id,mesh,home:new THREE.Vector3(),phase:random()*6};spheres.push(sphere)
+      }
+      if(!sphere)continue
+      const {mesh,home}=sphere;mesh.visible=!saved.deleted;mesh.userData.settings=saved
+      home.set(saved.x,saved.y,saved.z);mesh.position.copy(home);mesh.scale.setScalar(saved.scale);mesh.rotation.y=saved.rotationY
+      const kind=saved.material
+      const desired=kind?sphereMaterials[kind]:undefined
+      if(desired && kind && mesh.userData.materialKind!==kind){
+        if(mesh.userData.ownMaterial)(mesh.material as THREE.Material).dispose()
+        mesh.material=desired.clone();mesh.userData.ownMaterial=true;mesh.userData.materialKind=kind
+        mesh.layers.set(['glass','pink','amber'].includes(kind)?7:WORLD)
+      }
+      if(!mesh.userData.ownMaterial){mesh.material=(mesh.material as THREE.Material).clone();mesh.userData.ownMaterial=true}
+      const mat=mesh.material as THREE.MeshPhysicalMaterial
+      if(saved.color)mat.color.set(saved.color)
+      mat.opacity=saved.opacity??1;mat.transparent=mat.opacity<1;mat.roughness=saved.roughness??desired?.roughness??mat.roughness
+      mat.metalness=saved.metalness??desired?.metalness??mat.metalness
+      if('transmission' in mat){const physical=desired instanceof THREE.MeshPhysicalMaterial?desired:undefined;mat.transmission=saved.transmission??physical?.transmission??mat.transmission;mat.ior=saved.ior??physical?.ior??mat.ior}
     }
   }
-  updateParticles()
   return {
-    count, root, spheres,
-    audit:()=>({drawCount:geometry.drawRange.count,pointerSpeed:speed.value,sphereSpeed:sphereSpeed.value,particleSize:material.uniforms.sizeScale.value,particleBrightness:material.uniforms.brightness.value,repulsion:velocity.material.uniforms.repulsion.value,returnStrength:velocity.material.uniforms.returnStrength.value,spheres:spheres.map(s=>({id:s.id,position:s.mesh.position.toArray(),size:s.mesh.scale.x,material:(s.mesh.material as THREE.MeshPhysicalMaterial).color.getHexString()}))}),
-    updateParticles,updateSphere,addSphere,
-    removeSphere(id:string){const index=spheres.findIndex(s=>s.id===id);if(index<0)return;const [entry]=spheres.splice(index,1);entry.mesh.removeFromParent();(entry.mesh.material as THREE.Material).dispose()},
-    moveSphere(id:string,movement:number){const entry=spheres.find(s=>s.id===id);if(!entry)return;spherePointer.value.copy(entry.mesh.position);sphereSpeed.value=movement},
-    sphereWorld(id:string){return spheres.find(s=>s.id===id)?.mesh.position.clone()},
-    world,
-    pointer(x:number,y:number,movement:number){pointer.value.copy(world(x,y,-.8));speed.value=movement;active.value=1},
-    leave(){active.value=0},
+    count, root, spheres, syncSpheres, probeMoss,
+    audit:()=>({repulsion:repulsion.value,radius:radius.value,returnStrength:returnStrength.value,damping:damping.value,size:material.uniforms.sizeMultiplier.value,opacity:material.uniforms.opacityMultiplier.value,mossCount,mossStrength:mossStrength.value,simulatedMoss:!gpuError,simulationFrames,pointerActive:active.value,pointerX:pointer.value.x,pointerY:pointer.value.y}),
+    setControls(config:StudioConfig){
+      const p=config.particles
+      repulsion.value=p.repulsion;radius.value=p.radius;returnStrength.value=p.returnStrength;damping.value=p.damping;motionScale.value=p.speed;ambientSpeed.value=p.ambientSpeed
+      attraction.value=p.attraction;sphereForce.value=p.sphereForce;velocitySensitivity.value=p.velocitySensitivity
+      mossStrength.value=p.mossStrength
+      material.uniforms.sizeMultiplier.value=p.size;material.uniforms.opacityMultiplier.value=p.opacity;material.uniforms.brightnessMultiplier.value=p.brightness
+    },
+    pointer(x:number,y:number,movement:number){pointer.value.set(x,y);speed.value=movement;active.value=1},
+    sphereMove(position:THREE.Vector3,movement:number){spherePointer.value.copy(position);sphereSpeed.value=Math.min(movement,5)},
+    leave(){active.value=Math.min(active.value,.95)},
     tick(seconds:number,delta:number,reduced:boolean){
-      elapsed.value=reduced?0:seconds*particleSettings.speed;dt.value=Math.min(delta,.033)*particleSettings.speed
+      elapsed.value=reduced?0:seconds;dt.value=Math.min(delta,.033)
+      particleCameraEye.value.copy(camera.position)
+      const tangent=Math.tan(THREE.MathUtils.degToRad(camera.fov/2));projectionScale.value.set(1/(tangent*camera.aspect),1/tangent)
       material.uniforms.pixelRatio.value=renderer.getPixelRatio()
-      if(!gpuError&&!reduced){gpu.compute();material.uniforms.offsetMap.value=gpu.getCurrentRenderTarget(offsets).texture}
+      if(!gpuError&&!reduced){gpu.compute();simulationFrames++;const texture=gpu.getCurrentRenderTarget(offsets).texture;material.uniforms.offsetMap.value=texture;mossOffset.value=texture}
       renderer.getDrawingBufferSize(drawingSize)
       gardenSize.value.copy(drawingSize)
       speed.value*=Math.exp(-delta*4)
-      sphereSpeed.value*=Math.exp(-delta*4)
-      for(const {mesh,home,phase,id} of spheres){
+      if(active.value<1)active.value*=Math.exp(-delta*5)
+      sphereSpeed.value*=Math.exp(-delta*7)
+      for(const {mesh,home,phase} of spheres){
+        if(!mesh.visible)continue
         mesh.position.copy(home)
-        const setting=config.spheres.find(s=>s.id===id)
-        if(!reduced&&setting){mesh.position.y+=Math.sin(seconds*.3*setting.speed+phase)*setting.float*4/(setting.damping+1);mesh.rotation.y+=delta*.015*setting.speed}
+        const options=mesh.userData.settings as SphereTransform|undefined
+        if(!reduced){mesh.position.y+=Math.sin(seconds*.3*(options?.floatSpeed??1)+phase)*.006;mesh.rotation.y+=delta*.015*(options?.floatSpeed??1)}
       }
     },
     dispose(){root.removeFromParent();const geometries=new Set<THREE.BufferGeometry>(),mats=new Set<THREE.Material>();

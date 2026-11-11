@@ -1,0 +1,27 @@
+name: Bottle controls check
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - run: |
+          npm install --no-save --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Verify bottle settings in Chrome
+        run: |
+          npm run dev -- --host 127.0.0.1 > /tmp/nocturne-vite.log 2>&1 &
+          node .github/scripts/verify-bottle-controls.mjs
