@@ -21,22 +21,6 @@ npm install
 npm run dev
 ```
 
-## Creator Studio
-
-Creator Studio is a local development tool. Start Vite bound to your own machine and open `http://127.0.0.1:5173/creator.html`:
-
-```sh
-npm run dev -- --host 127.0.0.1
-```
-
-The Creator page is not included in `dist/` or the GitHub Pages deployment. The public `index.html` is Visitor Mode and never reads browser drafts or presets. Do not expose the development server to the internet.
-
-The right panel contains Bottle, Particles, Spheres, Lighting, Atmosphere, Brushes, Camera and Presets. Choose **Sphere select**, then click and drag an orb in the canvas. The on-screen handle resizes it; the selected orb's panel edits depth, material, color and motion. **Paint** applies localized screen-space color grading. The Eraser removes nearby strokes. Brush strokes do not create real 3D lights; light controls above them operate actual Three.js lights. **Preview** hides editing controls; use **Open Creator Studio** to return. The preview size menu tests desktop, laptop, tablet and phone framing.
-
-Changes autosave in this browser, and **Save** explicitly writes the same local draft. Undo/redo, per-field reset, sphere duplication/deletion, presets, and JSON import/export are in the panel. To publish an approved composition, choose **Export JSON**, review it, replace `src/visitor-scene.json` with the exported file in a new repository change, then build and deploy that change through the normal review process. Saving in the browser alone does not change the public site. The scene schema and defaults live in `src/studio-config.ts`; editor controls live in `src/creator-studio.ts`, while the hero, garden GPU simulation and optical stage remain separate modules.
-
-The current studio has practical limits: sphere rotation is around its vertical axis; there are no sculpting controls for the original GLB geometry; brush grading is screen-space and holds up to 64 strokes. Glass and liquid use the existing real-time refraction approximation, not full path tracing. On small devices the garden retains its adaptive 9,216-particle ceiling. The studio provides light positions numerically rather than 3D light handles.
-
 ## Production build
 
 ```sh
