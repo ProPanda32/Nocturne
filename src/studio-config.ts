@@ -1,17 +1,19 @@
-export type SphereTransform={x:number;y:number;z:number;scale:number;rotationY:number;locked?:boolean;deleted?:boolean;material?:'glass'|'pink'|'amber'|'moss'|'cream'|'gold';color?:string;opacity?:number;roughness?:number;metalness?:number;transmission?:number;ior?:number;floatSpeed?:number;interaction?:number}
-export type BrushStroke={x:number;y:number;size:number;strength:number;kind:'Hue'|'Saturation'|'Warmth'|'Glow'|'Brightness'|'Eraser'}
+export type SphereTransform={x:number;y:number;z:number;scale:number;rotationY:number;locked?:boolean;deleted?:boolean;material?:'glass'|'pink'|'amber'|'moss'|'cream'|'gold';color?:string;opacity?:number;roughness?:number;metalness?:number;transmission?:number;ior?:number;floatSpeed?:number;interaction?:number;hue?:number;saturation?:number;reflection?:number;glow?:number;floatAmplitude?:number;movementDamping?:number}
+export type BrushStroke={x:number;y:number;size:number;strength:number;kind:'Hue'|'Saturation'|'Warmth'|'Glow'|'Brightness'|'Eraser';softness?:number;opacity?:number}
 export type StudioConfig={
   version:number
-  bottle:{x:number;y:number;z:number;scale:number;rotationX:number;rotationY:number;rotationZ:number;glassTint:string;glassRoughness:number;glassIor:number;glassTransmission:number;liquidTint:string;liquidAbsorption:number;capTint:string;goldTint:string;autoRotate:boolean;autoSpeed:number;dragSensitivity:number;inertia:number;damping:number;maxSpeed:number}
-  particles:{count:number;size:number;opacity:number;brightness:number;speed:number;repulsion:number;radius:number;returnStrength:number;damping:number;ambientSpeed:number;sphereForce:number;attraction:number;velocitySensitivity:number;mossStrength:number}
+  bottle:{x:number;y:number;z:number;scale:number;rotationX:number;rotationY:number;rotationZ:number;glassTint:string;glassRoughness:number;glassIor:number;glassTransmission:number;glassReflection:number;liquidTint:string;liquidAbsorption:number;liquidOpacity:number;capTint:string;capIor:number;capRoughness:number;goldTint:string;goldRoughness:number;autoRotate:boolean;autoSpeed:number;dragSensitivity:number;verticalSensitivity:number;verticalLimit:number;momentumSensitivity:number;inertia:number;damping:number;friction:number;maxSpeed:number}
+  particles:{count:number;size:number;sizeVariation:number;color:string;secondaryColor:string;hue:number;saturation:number;glow:number;opacity:number;brightness:number;speed:number;repulsion:number;radius:number;returnStrength:number;damping:number;momentum:number;turbulence:number;spread:number;depth:number;clustering:number;ambientSpeed:number;sphereForce:number;attraction:number;velocitySensitivity:number;mossStrength:number}
   spheres:Record<string,SphereTransform>
-  lighting:{ambient:number;key:number;keyColor:string;rim:number;rimColor:string;exposure:number}
-  atmosphere:{hue:number;saturation:number;contrast:number;brightness:number;warmth:number;fog:number;fogColor:string;glow:number}
-  camera:{x:number;y:number;distance:number;fov:number}
+  lighting:{ambient:number;key:number;keyColor:string;keyX:number;keyY:number;keyZ:number;rim:number;rimColor:string;rimX:number;rimY:number;rimZ:number;back:number;backColor:string;backX:number;backY:number;backZ:number;warm:number;warmColor:string;warmX:number;warmY:number;warmZ:number;temperature:number;reflection:number;exposure:number;bloom:number;bloomThreshold:number;highlight:number;shadow:number}
+  atmosphere:{hue:number;saturation:number;contrast:number;brightness:number;warmth:number;temperature:number;fog:number;fogColor:string;glow:number;background:string;depth:number}
+  camera:{x:number;y:number;distance:number;pitch:number;yaw:number;roll:number;zoom:number;fov:number;framing:number;mobileScale:number;mobileFraming:number;sceneDepth:number}
   brushes:BrushStroke[]
   brushTool:'Off'|'Hue'|'Saturation'|'Warmth'|'Glow'|'Brightness'|'Eraser'
   brushSize:number
   brushStrength:number
+  brushSoftness:number
+  brushOpacity:number
 }
 import defaultConfig from '../Public/Assets/Config/creator-studio.default.json'
 export const production:StudioConfig=defaultConfig as StudioConfig
@@ -35,7 +37,7 @@ export function mergeConfig(value:unknown):StudioConfig{
       const e=entry as Record<string,unknown>
       if(['x','y','z','scale','rotationY'].every(k=>typeof e[k]==='number'&&Number.isFinite(e[k]))) {
         const sphere:SphereTransform={x:e.x as number,y:e.y as number,z:e.z as number,scale:e.scale as number,rotationY:e.rotationY as number,locked:e.locked===true,deleted:e.deleted===true}
-        for(const k of ['opacity','roughness','metalness','transmission','ior','floatSpeed','interaction'] as const)if(typeof e[k]==='number'&&Number.isFinite(e[k]))sphere[k]=e[k] as number
+        for(const k of ['opacity','roughness','metalness','transmission','ior','floatSpeed','interaction','hue','saturation','reflection','glow','floatAmplitude','movementDamping'] as const)if(typeof e[k]==='number'&&Number.isFinite(e[k]))sphere[k]=e[k] as number
         if(typeof e.color==='string'&&/^#[0-9a-f]{6}$/i.test(e.color))sphere.color=e.color
         if(['glass','pink','amber','moss','cream','gold'].includes(String(e.material)))sphere.material=e.material as SphereTransform['material']
         copy.spheres[id]=sphere
@@ -45,7 +47,9 @@ export function mergeConfig(value:unknown):StudioConfig{
   if(['Off','Hue','Saturation','Warmth','Glow','Brightness','Eraser'].includes(String(raw.brushTool)))copy.brushTool=raw.brushTool as StudioConfig['brushTool']
   if(typeof raw.brushSize==='number'&&Number.isFinite(raw.brushSize))copy.brushSize=raw.brushSize
   if(typeof raw.brushStrength==='number'&&Number.isFinite(raw.brushStrength))copy.brushStrength=raw.brushStrength
-  if(Array.isArray(raw.brushes))copy.brushes=raw.brushes.filter((e:unknown)=>e&&typeof e==='object').slice(0,200) as StudioConfig['brushes']
+  if(typeof raw.brushSoftness==='number'&&Number.isFinite(raw.brushSoftness))copy.brushSoftness=raw.brushSoftness
+  if(typeof raw.brushOpacity==='number'&&Number.isFinite(raw.brushOpacity))copy.brushOpacity=raw.brushOpacity
+  if(Array.isArray(raw.brushes))copy.brushes=raw.brushes.filter((e:unknown)=>e&&typeof e==='object').slice(-64) as StudioConfig['brushes']
   return copy
 }
 function legacyConfig():StudioConfig|undefined{

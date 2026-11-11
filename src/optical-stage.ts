@@ -28,9 +28,9 @@ export function createOpticalStage(renderer: THREE.WebGLRenderer, scene: THREE.S
   })
   const sky = new THREE.ShaderMaterial({
     depthTest: false, depthWrite: false,
-    uniforms: { time, floorLine: floor, aspect: { value: 2 }, opticalFill: { value: 0 }, mistDensity:{value:0},mistColor:{value:new THREE.Color('#101c1e')} }, vertexShader: screenVertex,
+    uniforms: { time, floorLine: floor, aspect: { value: 2 }, opticalFill: { value: 0 }, mistDensity:{value:0},mistColor:{value:new THREE.Color('#101c1e')},backgroundTint:{value:new THREE.Color('#080c0c')} }, vertexShader: screenVertex,
     fragmentShader: `
-      varying vec2 vUv; uniform float time, floorLine, aspect,opticalFill,mistDensity; uniform vec3 mistColor;
+      varying vec2 vUv; uniform float time, floorLine, aspect,opticalFill,mistDensity; uniform vec3 mistColor,backgroundTint;
       float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
       float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+1.),f.x),f.y);}
       void main(){
@@ -39,6 +39,7 @@ export function createOpticalStage(renderer: THREE.WebGLRenderer, scene: THREE.S
         float blue=exp(-length((p-vec2(.66,1.05))*vec2(2.8,2.1))*3.);
         float gold=exp(-length((p-vec2(.50,.43))*vec2(6.,5.))*2.4);
         vec3 c=vec3(.003,.005,.004)+vec3(.028,.065,.09)*blue*(.7+mist);
+        c+=backgroundTint-vec3(.00243,.00368,.00368);
         c+=vec3(.22,.105,.032)*gold*(.65+mist*.5);
         float shaft=pow(max(0.,1.-abs(p.x+.55*p.y-.98)*5.),14.);
         c+=vec3(.025,.047,.057)*shaft*mist;
@@ -55,12 +56,12 @@ export function createOpticalStage(renderer: THREE.WebGLRenderer, scene: THREE.S
   const copy = new THREE.MeshBasicMaterial({ map: backdrop.texture, depthTest: false, depthWrite: false, toneMapped: false })
   const film = new THREE.ShaderMaterial({
     uniforms: { frame: { value: image.texture }, depthMap: { value: image.depthTexture }, bottleMask: { value: glassDepth.texture }, bottleGlow: { value: 0 }, size, time, floor,
-      near: { value: camera.near }, far: { value: camera.far }, focus: { value: 5 }, softness: { value: 1 }, grade: { value: new THREE.Vector4(1,1,1,0) }, glowAmount: { value: 1 }, brushCount:{value:0},brushes:{value:Array.from({length:64},()=>new THREE.Vector4())},brushKinds:{value:new Float32Array(64)} },
+      near: { value: camera.near }, far: { value: camera.far }, focus: { value: 5 }, softness: { value: 1 }, grade: { value: new THREE.Vector4(1,1,1,0) }, glowAmount: { value: 1 },bloomThreshold:{value:.9},highlightIntensity:{value:1},temperature:{value:0},shadowStrength:{value:1},brushCount:{value:0},brushes:{value:Array.from({length:64},()=>new THREE.Vector4())},brushKinds:{value:new Float32Array(64)},brushSoftness:{value:new Float32Array(64)} },
     vertexShader: screenVertex, depthTest: false, depthWrite: false,
     fragmentShader: `
       uniform sampler2D frame,depthMap,bottleMask; uniform vec2 size;
-      uniform float time,floor,near,far,focus,softness,glowAmount,bottleGlow; uniform vec4 grade; varying vec2 vUv;
-      uniform int brushCount; uniform vec4 brushes[64];uniform float brushKinds[64];
+      uniform float time,floor,near,far,focus,softness,glowAmount,bottleGlow,bloomThreshold,highlightIntensity,temperature,shadowStrength; uniform vec4 grade; varying vec2 vUv;
+      uniform int brushCount; uniform vec4 brushes[64];uniform float brushKinds[64],brushSoftness[64];
       float distanceAt(vec2 p){float d=texture2D(depthMap,p).x;return near*far/(far-d*(far-near));}
       vec3 softImage(vec2 p,float r){
         vec2 t=r/size; vec3 c=texture2D(frame,p).rgb*.24;
@@ -87,8 +88,10 @@ export function createOpticalStage(renderer: THREE.WebGLRenderer, scene: THREE.S
         vec3 reflected=softImage(mirror,3.+below*12.);
         c=mix(c,reflected*vec3(.30,.25,.20),reflectionFade*.48);
         // Restrained local bloom preserves dark surround and avoids white clipping.
-        vec3 halo=max(softImage(p,5.)-.9,0.)*.065+max(softImage(p,12.)-1.3,0.)*.035;
+        vec3 halo=max(softImage(p,5.)-bloomThreshold,0.)*.065+max(softImage(p,12.)-(bloomThreshold+.4),0.)*.035;
         c+=halo*glowAmount;
+        c+=max(c-.7,0.)*(highlightIntensity-1.)*.25;
+        c*=1.-(shadowStrength-1.)*.16*exp(-pow((p.x-.5)*5.,2.))*exp(-pow((p.y-floor)*25.,2.))*step(p.y,floor);
         if(bottleGlow>0.){
           float around=0.;
           for(int j=0;j<8;j++){
@@ -104,10 +107,10 @@ export function createOpticalStage(renderer: THREE.WebGLRenderer, scene: THREE.S
         c=mix(vec3(luma),c,grade.y);
         c=(c-.5)*grade.z+.5;
         c*=grade.x;
-        c.r+=grade.w*.10; c.b-=grade.w*.08;
+        c.r+=grade.w*.10+temperature*.05; c.b-=grade.w*.08+temperature*.05;
         for(int i=0;i<64;i++){
           if(i>=brushCount)break;
-          vec4 b=brushes[i];float weight=exp(-dot((p-b.xy)*vec2(size.x/size.y,1.),(p-b.xy)*vec2(size.x/size.y,1.))*2./max(b.z*b.z,.0001))*b.w;
+          vec4 b=brushes[i];float weight=exp(-dot((p-b.xy)*vec2(size.x/size.y,1.),(p-b.xy)*vec2(size.x/size.y,1.))*(.2+3.*brushSoftness[i])/max(b.z*b.z,.0001))*b.w;
           float l=dot(c,vec3(.2126,.7152,.0722));
           if(brushKinds[i]<.5)c=mix(c,c.gbr,weight*.7);
           else if(brushKinds[i]<1.5)c=mix(c,vec3(l)+(c-vec3(l))*1.8,weight);
@@ -223,17 +226,22 @@ export function createOpticalStage(renderer: THREE.WebGLRenderer, scene: THREE.S
       const material=mesh.material as THREE.MeshPhysicalMaterial
       const role=material.userData.role
       if(role==='glass'){material.color.set(b.glassTint);material.roughness=b.glassRoughness;material.ior=b.glassIor;material.transmission=b.glassTransmission}
-      if(role==='cap')material.color.set(b.capTint)
-      if(role==='liquid'){material.attenuationColor.set(b.liquidTint);material.attenuationDistance=b.liquidAbsorption}
-      if(role==='gold')material.color.set(b.goldTint)
+      if(role==='cap'){material.color.set(b.capTint);material.ior=b.capIor;material.roughness=b.capRoughness}
+      if(role==='liquid'){material.attenuationColor.set(b.liquidTint);material.attenuationDistance=b.liquidAbsorption;material.transparent=b.liquidOpacity<1;material.opacity=b.liquidOpacity}
+      if(role==='gold'){material.color.set(b.goldTint);material.roughness=b.goldRoughness}
     }
     const a=config.atmosphere
     film.uniforms.grade.value.set(a.brightness,a.saturation,a.contrast,a.warmth)
-    film.uniforms.glowAmount.value=a.glow
-    sky.uniforms.mistDensity.value=a.fog;sky.uniforms.mistColor.value.set(a.fogColor)
-    const strokes=config.brushes.slice(-64), vectors=film.uniforms.brushes.value as THREE.Vector4[], kinds=film.uniforms.brushKinds.value as Float32Array
+    film.uniforms.glowAmount.value=a.glow*config.lighting.bloom
+    film.uniforms.bloomThreshold.value=config.lighting.bloomThreshold
+    film.uniforms.highlightIntensity.value=config.lighting.highlight
+    film.uniforms.temperature.value=a.temperature+config.lighting.temperature
+    film.uniforms.shadowStrength.value=config.lighting.shadow
+    film.uniforms.softness.value=a.depth
+    sky.uniforms.mistDensity.value=a.fog;sky.uniforms.mistColor.value.set(a.fogColor);sky.uniforms.backgroundTint.value.set(a.background)
+    const strokes=config.brushes.slice(-64), vectors=film.uniforms.brushes.value as THREE.Vector4[], kinds=film.uniforms.brushKinds.value as Float32Array,softness=film.uniforms.brushSoftness.value as Float32Array
     film.uniforms.brushCount.value=strokes.length
-    strokes.forEach((stroke,i)=>{vectors[i].set(stroke.x,1-stroke.y,stroke.size,stroke.strength);kinds[i]=['Hue','Saturation','Warmth','Glow','Brightness'].indexOf(stroke.kind)})
+    strokes.forEach((stroke,i)=>{vectors[i].set(stroke.x,1-stroke.y,stroke.size,stroke.strength*(stroke.opacity??1));kinds[i]=['Hue','Saturation','Warmth','Glow','Brightness'].indexOf(stroke.kind);softness[i]=stroke.softness??.7})
   }
 
   function setBottleFinish(reflection:number,glow:number){
